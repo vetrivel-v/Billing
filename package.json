@@ -42,5 +42,8 @@
     "typescript": "~6.0",
     "typescript-eslint": "^8.71.2",
     "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.2"
   }
 }

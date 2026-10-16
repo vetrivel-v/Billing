@@ -35,5 +35,14 @@ export default tseslint.config(
     files: ['scripts/**', 'tests/**', 'prisma/seed/**', '**/*.test.ts', '**/*.test.tsx'],
     rules: { 'no-console': 'off' },
   },
+  {
+    // CommonJS spike scripts that must run under plain Node and Electron-as-Node.
+    files: ['scripts/spikes/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { require: 'readonly', process: 'readonly' },
+    },
+    rules: { '@typescript-eslint/no-require-imports': 'off', 'no-console': 'off' },
+  },
   prettier,
 );

@@ -46,6 +46,7 @@ reviewed in the diff.
 - [ ] Authentication / authorization / privilege escalation (Phase 1)
 - [ ] Rate limiting on login (Phase 1)
 - [ ] Path traversal / upload restrictions (Phase 1+)
+- [x] Per-launch secret guard on API (Task 1.0; not yet wired into shell)
 - [ ] IPC argument validation for every channel (Phase 1+)
-- [ ] Sensitive-data logging prevention test (Phase 1)
+- [x] Sensitive-data logging prevention test for header secrets (Task 1.0); extend per new secret field
 - [ ] Backup encryption / wrong password / corruption (Phase 1)

@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   }
 
   const prisma = createPrismaClient(env.DATABASE_URL);
-  const app = await buildApp({ env, prisma });
+  const app = await buildApp({ env, prisma, launchSecret: env.LAUNCH_SECRET });
 
   const shutdown = async (): Promise<void> => {
     await app.close();

@@ -19,6 +19,8 @@ const pg = new EmbeddedPostgres({
   user: DEV_DB.user,
   password: DEV_DB.password,
   persistent: true,
+  // Force UTF8: the Windows default (WIN1252) cannot store Indian-language text (risk R-035).
+  initdbFlags: ['--encoding=UTF8'],
   onLog: () => {},
   onError: (e) => console.error('[postgres]', e),
 });

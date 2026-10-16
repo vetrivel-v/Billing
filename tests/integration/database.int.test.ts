@@ -134,3 +134,14 @@ describe('API /health/db with a real database', () => {
     await app.close();
   });
 });
+
+describe('database encoding (R-035)', () => {
+  it('uses UTF8 and round-trips Indian-language text', async () => {
+    const enc = await prisma.$queryRaw<{ server_encoding: string }[]>`SHOW server_encoding`;
+    expect(enc[0]?.server_encoding).toBe('UTF8');
+    const name = 'डेमो व्यापार (काल्पनिक) — தமிழ் — ગુજરાતી';
+    const org = await prisma.organization.create({ data: { legalName: name } });
+    const back = await prisma.organization.findUniqueOrThrow({ where: { id: org.id } });
+    expect(back.legalName).toBe(name);
+  });
+});

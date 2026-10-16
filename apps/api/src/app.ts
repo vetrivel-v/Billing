@@ -12,16 +12,27 @@ import {
   type HealthResponse,
 } from '@commercebill/shared-types';
 import type { AppEnv } from '@commercebill/validation';
+import { LAUNCH_SECRET_HEADER, isExemptPath, launchSecretMatches } from './launch-secret.js';
 
 export interface AppDeps {
   env: Pick<AppEnv, 'LOG_LEVEL' | 'WEB_ORIGIN'>;
   /** Optional: when absent, /health/db reports the database as down. */
   prisma?: PrismaClient | undefined;
+  /**
+   * Per-launch shared secret between the Electron shell and the API (ADR-0010, risk R-032).
+   * When set, every route except liveness requires the ${LAUNCH_SECRET_HEADER} header.
+   */
+  launchSecret?: string | undefined;
+  /** Test hook: capture structured logs. */
+  logStream?: { write(msg: string): void } | undefined;
 }
 
 /** Fields that must never reach logs (spec sections 33 and 53). */
 export const LOG_REDACT_PATHS = [
   'req.headers.authorization',
+  '*.headers.authorization',
+  '*.headers.cookie',
+  '*.headers["x-commercebill-launch-secret"]',
   'req.headers.cookie',
   'res.headers["set-cookie"]',
   '*.password',
@@ -29,6 +40,7 @@ export const LOG_REDACT_PATHS = [
   '*.token',
   '*.secret',
   '*.apiKey',
+  'req.headers["x-commercebill-launch-secret"]',
 ];
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
@@ -36,6 +48,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     logger: {
       level: deps.env.LOG_LEVEL,
       redact: { paths: LOG_REDACT_PATHS, censor: '[REDACTED]' },
+      ...(deps.logStream ? { stream: deps.logStream } : {}),
     },
     genReqId: () => randomUUID(),
     requestIdHeader: false,
@@ -48,6 +61,23 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   // Coarse global limiter; stricter per-route limits (e.g. login) arrive in Phase 1.
   await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+
+  const launchSecret = deps.launchSecret;
+  if (launchSecret) {
+    app.addHook('onRequest', async (req, reply) => {
+      if (isExemptPath(req.url)) return;
+      if (launchSecretMatches(launchSecret, req.headers[LAUNCH_SECRET_HEADER])) return;
+      const body: ApiErrorBody = {
+        error: {
+          code: ErrorCodes.UNAUTHENTICATED,
+          message: 'This request was not authorised.',
+          dataSaved: false,
+          correlationId: req.id,
+        },
+      };
+      return reply.code(401).send(body);
+    });
+  }
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-correlation-id', req.id);

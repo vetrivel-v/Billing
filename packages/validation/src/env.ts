@@ -27,6 +27,8 @@ export const envSchema = z.object({
         .filter(Boolean),
     )
     .pipe(z.array(z.url()).min(1)),
+  /** Per-launch shared secret from the Electron shell (ADR-0010). Optional in development. */
+  LAUNCH_SECRET: z.string().min(32, 'LAUNCH_SECRET must be at least 32 characters').optional(),
   DATABASE_URL: z.string().refine((v) => /^postgres(ql)?:\/\//.test(v), {
     message: 'DATABASE_URL must be a postgresql:// connection string',
   }),

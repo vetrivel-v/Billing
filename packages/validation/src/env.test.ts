@@ -46,3 +46,19 @@ describe('isLoopbackHost', () => {
     expect(isLoopbackHost(h)).toBe(false);
   });
 });
+
+describe('LAUNCH_SECRET', () => {
+  it('is optional but must be at least 32 characters when present', () => {
+    expect(parseEnv(base).LAUNCH_SECRET).toBeUndefined();
+    expect(() => parseEnv({ ...base, LAUNCH_SECRET: 'short' })).toThrow(/at least 32/);
+    expect(parseEnv({ ...base, LAUNCH_SECRET: 'x'.repeat(32) }).LAUNCH_SECRET).toHaveLength(32);
+  });
+  it('does not echo a rejected secret value', () => {
+    try {
+      parseEnv({ ...base, LAUNCH_SECRET: 'tooshort-but-secret' });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as Error).message).not.toContain('tooshort-but-secret');
+    }
+  });
+});
