@@ -1,6 +1,6 @@
 # ADR-0010: Shell-to-API authentication with a per-launch secret
 
-- Status: Accepted (guard implemented and tested; wiring into the Electron shell is a later Phase 1 task)
+- Status: Accepted (guard implemented and tested; wiring into the Electron shell is requirement P1-SEC-01, which must land before any data-bearing API route)
 - Date: 2026-10-16
 - Resolves: risk R-032 (design); residual risk R-037
 

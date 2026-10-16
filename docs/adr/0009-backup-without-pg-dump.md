@@ -1,6 +1,6 @@
 # ADR-0009: Backup uses a verified logical export ("migrate, then load")
 
-- Status: Accepted (spike proven; production implementation is a later Phase 1 task)
+- Status: Accepted (experimental spike proven; NOT production backup - production module is requirement P1-BKP-01)
 - Date: 2026-10-16
 - Resolves: risk R-031
 

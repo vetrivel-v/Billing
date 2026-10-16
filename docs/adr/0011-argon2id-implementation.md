@@ -1,6 +1,6 @@
 # ADR-0011: Argon2id via @node-rs/argon2
 
-- Status: Accepted (library proven in Node and Electron; the auth service is a later Phase 1 task)
+- Status: Accepted (library proven in Node and Electron; the password service is requirement P1-AUTH-01)
 - Date: 2026-10-16
 - Resolves: risk R-033 (load/ABI); residual packaging check R-038
 

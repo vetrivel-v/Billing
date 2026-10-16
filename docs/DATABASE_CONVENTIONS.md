@@ -22,3 +22,6 @@
 11. **Indexes**: add an index only with a stated query; composite indexes begin with `organization_id`.
 12. **Seeds**: `prisma/seed/reference` (safe for production) and `prisma/seed/demo` (fictional, marked DEMO
     DATA, never automatic).
+13. **Encoding**: every cluster and database must be UTF8 (`initdb --encoding=UTF8`). The Windows default
+    (WIN1252) cannot store Indian-language text; this was found in Phase 1 Task 1.0 (risk R-035) and is enforced
+    for dev/test clusters and covered by an integration test. Production initialisation: requirement P6-ENC-01.
