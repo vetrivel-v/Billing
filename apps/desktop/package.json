@@ -1,0 +1,16 @@
+{
+  "name": "@commercebill/desktop",
+  "version": "0.0.1",
+  "private": true,
+  "description": "CommerceBill Desktop Electron shell",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "tsup",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@commercebill/shared-types": "^0.0.1",
+    "electron": "^44.8.0"
+  }
+}

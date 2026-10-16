@@ -1,0 +1,9 @@
+node_modules
+dist
+out
+coverage
+.data
+package-lock.json
+packages/database/src/generated
+prisma/migrations
+COMMERCEBILL_MASTER_SPEC_V2.md

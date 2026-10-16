@@ -1,0 +1,23 @@
+# OPTIONAL developer convenience (spec section 5). Docker is NOT required: `npm run db:start`
+# starts an embedded PostgreSQL instead. Credentials are throwaway development values.
+# The port is bound to loopback only.
+services:
+  postgres:
+    image: postgres:17
+    container_name: commercebill-postgres
+    environment:
+      POSTGRES_USER: commercebill
+      POSTGRES_PASSWORD: commercebill_dev
+      POSTGRES_DB: commercebill_dev
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - commercebill-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U commercebill -d commercebill_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  commercebill-pgdata:

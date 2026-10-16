@@ -1,0 +1,3 @@
+# meesho integration
+
+Status: NOT STARTED. NOT VERIFIED AGAINST LIVE SERVICE.

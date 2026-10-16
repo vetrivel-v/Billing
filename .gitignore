@@ -1,0 +1,13 @@
+node_modules/
+dist/
+out/
+coverage/
+.data/
+*.log
+.env
+.env.*
+!.env.example
+packages/database/src/generated/
+*.tsbuildinfo
+release/
+.vite/

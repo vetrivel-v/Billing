@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "prisma/seed/**/*.ts",
+    "prisma.config.ts",
+    "vitest.config.ts"
+  ]
+}
