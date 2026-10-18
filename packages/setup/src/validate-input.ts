@@ -4,6 +4,7 @@ import {
   normalizeUsername,
   type PasswordPolicy,
 } from '@commercebill/auth';
+import { setupSequencePlan, validateSequenceConfig } from '@commercebill/numbering';
 import { INDIA_STATE_CODES } from './india-state-codes.js';
 import {
   FY_MAX_YEAR,
@@ -35,6 +36,8 @@ export interface ValidatedSetupInput {
   };
   warehouse: { code: string; name: string };
   financialYearStart: Date;
+  /** The numbering sequences to create for the first financial year (defaults applied). */
+  sequences: ReturnType<typeof setupSequencePlan>;
   administrator: {
     username: string;
     displayName: string;
@@ -126,6 +129,25 @@ export function validateSetupInput(raw: unknown, passwordPolicy: PasswordPolicy)
     add('financialYear.startDate', 'date_out_of_range');
   }
 
+  // Document numbering (spec section 17): same rules as the numbering engine itself.
+  const sequences = setupSequencePlan(input.numbering);
+  const seen = new Set<string>();
+  for (const item of sequences) {
+    for (const prob of validateSequenceConfig(item.config)) {
+      const field =
+        prob.field === 'startNumber'
+          ? 'numbering.invoiceStartNumber'
+          : prob.field === 'numericLength'
+            ? 'numbering.numericWidth'
+            : `numbering.${item.field}`;
+      const key = `${field}:${prob.rule}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        add(field, prob.rule);
+      }
+    }
+  }
+
   const username = normalizeUsername(input.administrator.username);
   if (!isValidUsername(username)) add('administrator.username', 'invalid_username');
   const displayName = clean(input.administrator.displayName);
@@ -167,6 +189,7 @@ export function validateSetupInput(raw: unknown, passwordPolicy: PasswordPolicy)
       },
       warehouse: { code: warehouseCode, name: clean(input.warehouse?.name) ?? 'Main Warehouse' },
       financialYearStart: fyStart,
+      sequences,
       administrator: { username, displayName, email, password: input.administrator.password },
     },
   };

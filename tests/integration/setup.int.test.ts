@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { createNumberingService } from '@commercebill/numbering';
 import { createSetupService, SETUP_DRAFT_KEY, type SetupStep } from '@commercebill/setup';
 import type { PrismaClient } from '@commercebill/database';
 import { PERMISSIONS, ROLE_TEMPLATES, UNITS, TAX_CATEGORIES } from '@commercebill/reference-data';
@@ -33,6 +34,8 @@ async function counts(prisma: PrismaClient) {
   return {
     organizations: await prisma.organization.count(),
     organizationSettings: await prisma.organizationSetting.count(),
+    documentSequences: await prisma.documentSequence.count(),
+    allocations: await prisma.documentNumberAllocation.count(),
     locations: await prisma.businessLocation.count(),
     warehouses: await prisma.warehouse.count(),
     financialYears: await prisma.financialYear.count(),
@@ -51,6 +54,8 @@ async function counts(prisma: PrismaClient) {
 const NOTHING = {
   organizations: 0,
   organizationSettings: 0,
+  documentSequences: 0,
+  allocations: 0,
   locations: 0,
   warehouses: 0,
   financialYears: 0,
@@ -307,6 +312,34 @@ describe('fresh installation, resumable draft and failure handling', () => {
       'location.pinCode',
     ],
     [
+      'numbering prefix with illegal characters',
+      (v: Record<string, unknown>) => {
+        v.numbering = { invoicePrefix: 'INV #{FY}' };
+      },
+      'numbering.invoicePrefix',
+    ],
+    [
+      'numbering prefix that would repeat every year',
+      (v: Record<string, unknown>) => {
+        v.numbering = { creditNotePrefix: 'CN/2026-27/' };
+      },
+      'numbering.creditNotePrefix',
+    ],
+    [
+      'invoice start number wider than the width',
+      (v: Record<string, unknown>) => {
+        v.numbering = { invoiceStartNumber: 12345, numericWidth: 3 };
+      },
+      'numbering.invoiceStartNumber',
+    ],
+    [
+      'numbering with an unknown field',
+      (v: Record<string, unknown>) => {
+        v.numbering = { invoicePrefix: 'INV/{FY}/', secretKey: 'x' };
+      },
+      'numbering',
+    ],
+    [
       'wrong types',
       (v: Record<string, unknown>) => {
         v.administrator = 'owner';
@@ -345,6 +378,7 @@ describe('fresh installation, resumable draft and failure handling', () => {
     'location',
     'warehouse',
     'financial_year',
+    'numbering',
     'reference_data',
     'administrator',
     'draft_cleanup',
@@ -447,7 +481,9 @@ describe('successful setup and everything after it', () => {
     const after = await counts(fx.prisma);
     expect(after).toMatchObject({
       organizations: 1,
-      organizationSettings: 2,
+      organizationSettings: 3,
+      documentSequences: 5,
+      allocations: 0,
       locations: 1,
       warehouses: 1,
       financialYears: 1,
@@ -502,6 +538,56 @@ describe('successful setup and everything after it', () => {
       administratorUsername: 'shop.owner',
       nextStep: 'login',
     });
+  });
+
+  it('creates the default numbering sequences atomically and the first invoice number follows the configuration', async () => {
+    const org = await fx.prisma.organization.findFirstOrThrow();
+    const fy = await fx.prisma.financialYear.findFirstOrThrow();
+    const seqs = await fx.prisma.documentSequence.findMany({
+      where: { organizationId: org.id },
+      orderBy: { documentType: 'asc' },
+    });
+    expect(
+      seqs.map((q) => [
+        q.documentType,
+        q.prefix,
+        q.numericLength,
+        Number(q.startNumber),
+        q.resetPolicy,
+        q.isActive,
+        q.locationId,
+      ]),
+    ).toEqual([
+      ['CREDIT_NOTE', 'CN/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+      ['DEBIT_NOTE', 'DN/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+      ['INVOICE', 'INV/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+      ['PAYMENT_RECEIPT', 'PAY/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+      ['PURCHASE_ORDER', 'PO/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+    ]);
+    expect(seqs.every((q) => q.financialYearId === fy.id && q.lastNumber === 0n)).toBe(true); // nothing consumed
+    const settings = Object.fromEntries(
+      (await fx.prisma.organizationSetting.findMany()).map((x) => [x.key, x.value]),
+    );
+    expect(settings.numbering).toEqual({ scopeByLocation: false });
+    const numbering = createNumberingService();
+    const first = await fx.prisma.$transaction((db) =>
+      numbering.allocate(
+        db,
+        { organizationId: org.id, financialYearId: fy.id, documentType: 'INVOICE' },
+        { documentRef: 'first-invoice' },
+      ),
+    );
+    expect(first.number).toBe('INV/2026-27/000001');
+    const audit = await fx.prisma.auditLog.findMany({
+      where: { action: 'numbering.sequence.created' },
+    });
+    expect(audit).toHaveLength(5);
+    expect(
+      audit.every(
+        (a) =>
+          a.userId === null && (a.afterValues as { actor?: string }).actor === 'system:bootstrap',
+      ),
+    ).toBe(true);
   });
 
   it('6. the administrator password is hashed with Argon2id and policy was enforced', async () => {
@@ -764,5 +850,72 @@ describe('other business shapes', () => {
     const fy = await fx.prisma.financialYear.findFirstOrThrow();
     expect([fy.label, fy.endDate.toISOString().slice(0, 10)]).toEqual(['2026', '2026-12-31']);
     expect((await login(app, 'shop.owner', ADMIN_PASSWORD)).status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------
+describe('setup-time numbering configuration', () => {
+  let fx: Fixture;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    fx = await createFixture(inject('pgAdminUrl'), { bare: true });
+    app = await fx.makeApp();
+  }, 120_000);
+  afterAll(async () => fx?.close());
+
+  it('the draft accepts non-secret numbering answers and still rejects secret or malformed ones', async () => {
+    const good = {
+      numbering: { invoicePrefix: 'TAX-{FY}-', invoiceStartNumber: 1001, numericWidth: 5 },
+    };
+    const saved = await putDraft(app, good);
+    expect(saved.status).toBe(200);
+    expect((await call(app, 'GET', '/setup/draft')).json.draft!.data).toEqual(good);
+    for (const bad of [
+      { numbering: { invoicePrefix: 'x', apiKey: 'k' } },
+      { numbering: { invoiceStartNumber: '1001' } },
+      { numbering: { password: 'x' } },
+    ]) {
+      expect((await putDraft(app, bad, 1)).status).toBe(400);
+    }
+    const row = await fx.prisma.applicationSetting.findFirstOrThrow({
+      where: { organizationId: null, key: SETUP_DRAFT_KEY },
+    });
+    expect(JSON.stringify(row)).not.toMatch(/apiKey|password/);
+  });
+
+  it('custom numbering answers configure the sequences, in the same transaction, and drive the first numbers', async () => {
+    const body = valid() as ReturnType<typeof valid> & { numbering?: Record<string, unknown> };
+    body.numbering = {
+      invoicePrefix: 'TAX-{FY}-',
+      invoiceStartNumber: 1001,
+      creditNotePrefix: 'CRN/{FY}/',
+      debitNotePrefix: 'DBN/{FY}/',
+      purchasePrefix: 'PUR/{FY}/',
+      paymentPrefix: 'RCT/{FY}/',
+      numericWidth: 5,
+    };
+    const r = await complete(app, body);
+    expect(r.status, r.body).toBe(201);
+    expect(await fx.prisma.documentSequence.count()).toBe(5);
+    expect(await fx.prisma.documentNumberAllocation.count()).toBe(0);
+    const org = await fx.prisma.organization.findFirstOrThrow();
+    const fy = await fx.prisma.financialYear.findFirstOrThrow();
+    const numbering = createNumberingService();
+    const issue = (
+      type: 'INVOICE' | 'CREDIT_NOTE' | 'DEBIT_NOTE' | 'PURCHASE_ORDER' | 'PAYMENT_RECEIPT',
+    ) =>
+      fx.prisma.$transaction((db) =>
+        numbering.allocate(
+          db,
+          { organizationId: org.id, financialYearId: fy.id, documentType: type },
+          { documentRef: `first-${type}` },
+        ),
+      );
+    expect((await issue('INVOICE')).number).toBe('TAX-2026-27-01001');
+    expect((await issue('CREDIT_NOTE')).number).toBe('CRN/2026-27/00001');
+    expect((await issue('DEBIT_NOTE')).number).toBe('DBN/2026-27/00001');
+    expect((await issue('PURCHASE_ORDER')).number).toBe('PUR/2026-27/00001');
+    expect((await issue('PAYMENT_RECEIPT')).number).toBe('RCT/2026-27/00001');
   });
 });

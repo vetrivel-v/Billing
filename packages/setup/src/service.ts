@@ -1,6 +1,7 @@
 import type { AuthService } from '@commercebill/auth';
 import { AuthServiceError } from '@commercebill/auth';
 import type { Prisma, PrismaClient } from '@commercebill/database';
+import { createNumberingService } from '@commercebill/numbering';
 import { seedReferenceData } from '@commercebill/reference-data';
 import {
   DRAFT_FORMAT_VERSION,
@@ -40,6 +41,7 @@ export type SetupStep =
   | 'location'
   | 'warehouse'
   | 'financial_year'
+  | 'numbering'
   | 'reference_data'
   | 'administrator'
   | 'draft_cleanup'
@@ -271,6 +273,8 @@ export function createSetupService(options: SetupServiceOptions) {
               key: 'setup',
               value: { schemaVersion: 1, completedWithAppVersion: appVersion },
             },
+            // Numbering is per organization by default; per-location numbering is an explicit later opt-in.
+            { organizationId: org.id, key: 'numbering', value: { scopeByLocation: false } },
           ],
         });
         await step('settings');
@@ -306,10 +310,30 @@ export function createSetupService(options: SetupServiceOptions) {
         await step('warehouse');
 
         // 6. First financial year.
-        await tx.financialYear.create({
+        const financialYear = await tx.financialYear.create({
           data: { organizationId: org.id, label: fy.label, startDate: fy.start, endDate: fy.end },
         });
         await step('financial_year');
+
+        // 6b. Document numbering sequences for the first financial year (defaults or the wizard's answers).
+        const numbering = createNumberingService({ appVersion, clock });
+        for (const item of input.sequences) {
+          await numbering.createSequence(
+            tx,
+            {
+              organizationId: org.id,
+              financialYearId: financialYear.id,
+              documentType: item.documentType,
+              prefix: item.config.prefix,
+              suffix: item.config.suffix,
+              numericLength: item.config.numericLength,
+              startNumber: item.config.startNumber,
+              resetPolicy: item.config.resetPolicy,
+            },
+            { system: BOOTSTRAP_ACTOR, correlationId: context.correlationId },
+          );
+        }
+        await step('numbering');
 
         // 7. Reference data (permissions, the five role templates, units, UNREVIEWED tax placeholders).
         const seeded = await seedReferenceData(tx, { organizationId: org.id });
@@ -351,6 +375,7 @@ export function createSetupService(options: SetupServiceOptions) {
               administratorUserId: admin.id,
               gstStatus: input.business.gstStatus,
               financialYear: fy.label,
+              numberingSequences: input.sequences.map((x) => x.documentType),
               referenceDataInserted: seeded.created,
             },
             appVersion,

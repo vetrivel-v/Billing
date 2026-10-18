@@ -3,7 +3,7 @@
 Source of truth: [`prisma/schema.prisma`](../prisma/schema.prisma) and `prisma/migrations/`.
 Conventions: [DATABASE_CONVENTIONS.md](DATABASE_CONVENTIONS.md).
 
-**Implemented (18 tables since Phase 0; Task 1.1 added columns only):** the Foundation domain only. All other domains below are
+**Implemented (19 tables: 18 from Phase 0 plus `document_number_allocations` in Task 1.5):** the Foundation domain only. All other domains below are
 _designed_ (names and relationships reserved from spec section 34) and are created by the phase that owns
 them. Nothing in this file about an unimplemented domain should be read as existing code.
 
@@ -123,6 +123,17 @@ code; the GST-status rules (registered requires a GSTIN, unregistered forbids on
 consistency; and trigger `organizations_setup_completed_immutable` (once `setup_completed_at` is set it can never be
 cleared or changed). Existing violating rows make the migration abort atomically. The setup draft lives in
 `application_settings` (key `setup.draft`, global row).
+
+### 3.4 Changes in migration `20261020000000_task_1_5_document_numbering` (Task 1.5)
+
+- `document_sequences`: + `reset_policy` (FINANCIAL_YEAR | NEVER), `is_active`; CHECKs for the stable document-type code
+  form, reset policy, prefix/suffix length (<= 40) and start number fitting the width. Trigger: the counter may only
+  advance by exactly one (first number = start number), organization/location/financial year/document type are
+  immutable, the start number is frozen once a number is issued, and rows can never be deleted.
+- New table `document_number_allocations` (append-only ledger): one row per issued number with the printed text frozen,
+  `document_ref` (the document's internal id). Unique: (sequence, number), (organization, type, printed text),
+  (organization, type, document_ref). A trigger rejects a row that does not match its sequence or exceeds its counter;
+  UPDATE, DELETE and TRUNCATE are blocked.
 
 ## 4. Relationship explanation
 

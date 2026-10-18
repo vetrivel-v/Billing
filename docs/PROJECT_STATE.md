@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-18 (after Phase 1 Task 1.4). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-18 (after Phase 1 Task 1.5). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                               |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.4 complete; Task 1.5 not started**                                                                                                                                                             |
-| Current database version  | `20261019000000_task_1_4_setup_invariants` (18 tables; Task 1.4 added constraints and a trigger only)                                                                                                                             |
-| Last successful migration | `20261019000000_task_1_4_setup_invariants` - applied to clean databases by every integration file and to a populated previous-version database by the migration tests, 2026-10-18                                                 |
-| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                             |
-| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 200 unit + 163 integration tests (363) passed; coverage 96.8% statements / 93.4% branches / 99.0% functions / 98.7% lines; npm audit 0 vulnerabilities                     |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                   |
+| Item                      | Value                                                                                                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                     |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.5 complete; Task 1.6 not started**                                                                                                                                                                                   |
+| Current database version  | `20261020000000_task_1_5_document_numbering` (19 tables: Task 1.5 added `document_number_allocations`, two columns on `document_sequences`, constraints and triggers)                                                                                   |
+| Last successful migration | `20261020000000_task_1_5_document_numbering` - applied to clean databases by every integration file and to populated previous-version databases by the migration tests, 2026-10-18                                                                      |
+| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                   |
+| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 246 unit + 215 integration tests (461) passed; coverage 97.0% statements / 93.0% branches / 99.1% functions / 98.5% lines; npm audit 0 vulnerabilities                                           |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                         |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -98,6 +98,27 @@ the completion report.
 - Interpretation recorded: "invoice sequence configuration" is not collected here because PROJECT_STATE listed document
   numbering as out of scope; it is the core of proposed Task 1.5.
 
+## Task 1.5 results (document numbering engine; see docs/PHASE_1_TASK_1_5_COMPLETION_REPORT.md, ADR-0016)
+
+- New package `@commercebill/numbering`: stable document-type codes (INVOICE, CREDIT_NOTE, DEBIT_NOTE, PURCHASE_ORDER,
+  PAYMENT_RECEIPT), configuration-driven formatting (`{FY}` token), validation, and a service that works on the caller's
+  transaction: `allocate`, `createSequence`, `updateSequence`, `listSequences`, `openFinancialYear`, `findGaps`.
+- Migration `20261020000000`: `reset_policy`, `is_active`, the append-only `document_number_allocations` ledger, and
+  database triggers/constraints so the counter can only advance by one, history cannot be rewritten or deleted, and
+  no duplicate number/text/document can be committed - even by code that bypasses the engine.
+- Concurrency: row lock (`FOR UPDATE`) plus those invariants, no in-process lock. 40 parallel allocations, parallel
+  allocations with rollbacks (no gap), and 96 allocations across 8 sequences all behave; removing the lock makes four tests
+  fail; a deliberately unlocked allocator still cannot commit a duplicate.
+- Idempotent per document (`documentRef`, including retry after rollback and a same-document race across two financial years); drafts never consume numbers; rollback leaves no gap (policy in ADR-0016,
+  no statutory claim); configuration changes never renumber history.
+- First-run setup now also creates the five sequences (defaults or the wizard's answers) inside its atomic transaction
+  (12 failure points tested); the setup draft accepts the same non-secret numbering fields.
+- **The Task 1.5 brief was cut off at section G; the idempotency design is my reading of it (R-058).**
+- Existing-test changes caused by the schema growing: the backup-spike table-count assertion 18 -> 19, and setup
+  tests now expect 3 organization settings, 5 sequences and a 12th rollback step.
+- Mutation checks: removing the row lock failed 4 concurrency tests; removing the idempotency and active checks failed
+  5; a combined mutation that also skips a number each time failed 16 (the skip is rejected by the database trigger). Source restored and verified identical.
+
 ## In-progress modules
 
 None.
@@ -150,45 +171,46 @@ None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp in
 
 ## Exact next task
 
-**Phase 1, Task 1.5 - document numbering engine and setup-time sequence configuration (spec section 17; backend only).**
-Proposed scope (not started; do not begin without approval). No requirement IDs yet: assign T15-xx at the start.
+**Phase 1, Task 1.6 - authenticated user administration and password change API (first routes that use both guards).**
+Proposed scope (not started; do not begin without approval). No requirement IDs yet: assign T16-xx at the start.
+
+Why this task: every route so far is either liveness, bootstrap (no user can exist) or authentication itself. Task 1.6
+adds the first ordinary business-administration routes, which must demonstrate the pattern all later routes follow
+(`requireAuthenticatedUser` + `requirePermission(key)`), and closes R-047, R-048 and R-055.
 
 Scope:
 
-1. A numbering service in a package (no HTTP) working on the **caller's transaction client** so the number is allocated
-   in the same transaction that posts the document (spec section 17):
-   - `allocate(tx, { organizationId, documentType, financialYearId, locationId? })` takes the `document_sequences` row with
-     `SELECT ... FOR UPDATE`, increments `last_number` and returns the formatted number (prefix + zero-padded number +
-     suffix, e.g. `INV/2026-27/000001`). It never creates a missing sequence implicitly (error instead), never
-     reuses a number, and raises a clear error when the number would exceed the configured length.
-   - `configure`/`list` for sequences and a `preview` that formats a sample number. Document types are a fixed,
-     tested registry (INVOICE, CREDIT_NOTE, DEBIT_NOTE, PURCHASE_ORDER, PAYMENT; extendable by migration-free code).
-   - Validation: prefix/suffix limited to letters, digits and `/ - _ .`; numeric length 1-18; start number >= 1;
-     start number cannot be lowered once any number has been allocated.
-2. **Setup integration:** `POST /setup/complete` accepts an optional `numbering` section (invoice prefix and starting
-   number, credit-note, debit-note, purchase and payment prefixes; sensible defaults such as `INV/<FY>/`), validated
-   server-side, and creates the first financial year's sequences **inside the existing atomic transaction**. The draft
-   schema gains the same optional, non-secret fields (still no password; draft `formatVersion` unchanged because the
-   change is additive and optional - recorded in the ADR).
-3. Out of scope: invoices or any document tables, posting logic, gap reports (they need documents; deferred), financial-year
-   rollover and locking, per-location numbering UI, any UI, new business routes.
-4. Tests (acceptance criteria):
-   - unit: formatting, padding, overflow, prefix/suffix validation, start-number rules;
-   - integration: N concurrent allocations in separate transactions return distinct, consecutive numbers with no
-     duplicates or skips; an allocation inside a transaction that rolls back leaves the counter unchanged (the number was
-     never committed, so it is not "released" - documented policy); allocations for different financial years/documents/
-     locations are independent; allocation without a configured sequence fails with a clear error; the NULL-location
-     uniqueness (partial index) is respected;
-   - setup: completion with and without a `numbering` section creates the expected sequences atomically; the 11 failure
-     points still leave zero rows (including zero sequences); invalid numbering input is rejected without writes; the
-     draft accepts numbering fields but still rejects any secret field;
-   - If a schema change is needed: versioned migration plus migration test (a CHECK on prefix/suffix characters is the
-     expected candidate).
-5. `npm run verify:phase0` still passes (200 unit + 163 integration baseline, none weakened, gate-integrity checks
-   intact); coverage thresholds unchanged and met. Task 1.3 authentication and Task 1.4 setup tests must keep passing.
-6. PROJECT_STATE, REQUIREMENTS_MATRIX, RISK_REGISTER updated (risk R-024 financial-year sequence errors, R-003 duplicate
-   invoice numbers); an ADR for the allocation and policy decisions; a Task 1.5 completion report.
+1. **Password change (own account):** `POST /auth/change-password` (authenticated; current password required;
+   new password checked against the policy; rejects reuse of the current password; revokes the caller's OTHER
+   sessions; clears `must_change_password`; audited without password material).
+2. **Enforce `must_change_password`:** while set, every authenticated route except `GET /auth/me`,
+   `POST /auth/change-password` and `POST /auth/logout` answers 403 with a stable code (e.g. `AUTH_0004`
+   password change required). `/auth/me` reports the flag.
+3. **User administration routes** (permission keys from the Task 1.1 catalogue, no new hidden bypass):
+   - `GET /users` and `GET /users/:id` -> `security.user.read`
+   - `POST /users` (create with an initial password and role assignment; sets `must_change_password`) -> `security.user.manage`
+   - `POST /users/:id/disable` and `/enable` -> `security.user.manage` (disable revokes sessions; a user cannot disable
+     themselves; the last active Administrator cannot be disabled)
+   - `POST /users/:id/reset-password` (administrator-assisted: sets a temporary password, `must_change_password`,
+     revokes all of that user's sessions, clears lockout) -> `security.user.reset_password`
+   - `PUT /users/:id/roles` -> `security.role.manage` (cannot remove the last Administrator's Administrator role)
+     Every route is organization-scoped (a user of one organization can never read or change another's users) and
+     returns no password hash, token or secret.
+4. **Tests (acceptance criteria):** for each route, 401 without a session, 403 for each of the other four role
+   templates that lack the key, 200/201 for the permitted role; organization isolation; last-Administrator and
+   self-disable protections; forced password change flow end to end (create -> login -> blocked -> change ->
+   allowed); reset-password invalidates old sessions and password; old sessions rejected after change; audit events
+   exist and contain no secrets; passwords and tokens never in logs or responses; concurrent role/disable changes
+   cannot remove the last Administrator (database-level protection, not only a check); rate limiting on
+   change-password; migration + migration test if a schema change is needed (a trigger protecting the last
+   Administrator is the expected candidate).
+5. Out of scope: any UI, e-mail/self-service "forgot password" flows, MFA, role/permission editing, customers/products
+   or any other business route, the setup wizard screens.
+6. `npm run verify:phase0` still passes (246 unit + 215 integration baseline, none weakened, gate-integrity checks
+   intact); coverage thresholds unchanged and met. Task 1.3 auth, Task 1.4 setup and Task 1.5 numbering tests must
+   keep passing.
+7. PROJECT_STATE, REQUIREMENTS_MATRIX, RISK_REGISTER updated (R-047, R-048, R-055); an ADR for the decisions; a
+   Task 1.6 completion report.
 
-Other open Phase 1 work, in no committed order: login/setup UI, password change/reset and user-management routes
-(R-047, R-048, R-055), P1-BKP-01 (production backup), tax engine, customers/products/inventory, invoicing, PDF,
-payments, reports, import/export.
+Other open Phase 1 work, in no committed order: login/setup UI, P1-BKP-01 (production backup), tax engine,
+customers/products/inventory, invoicing, PDF, payments, reports, import/export.

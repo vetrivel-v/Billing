@@ -50,18 +50,19 @@ model Organization {
   updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   version          Int                   @default(1)
 
-  settings            OrganizationSetting[]
-  locations           BusinessLocation[]
-  financialYears      FinancialYear[]
-  warehouses          Warehouse[]
-  users               User[]
-  roles               Role[]
-  documentSequences   DocumentSequence[]
-  taxCategories       TaxCategory[]
-  taxRates            TaxRate[]
-  units               Unit[]
-  auditLogs           AuditLog[]
-  applicationSettings ApplicationSetting[]
+  settings                  OrganizationSetting[]
+  locations                 BusinessLocation[]
+  financialYears            FinancialYear[]
+  warehouses                Warehouse[]
+  users                     User[]
+  roles                     Role[]
+  documentSequences         DocumentSequence[]
+  documentNumberAllocations DocumentNumberAllocation[]
+  taxCategories             TaxCategory[]
+  taxRates                  TaxRate[]
+  units                     Unit[]
+  auditLogs                 AuditLog[]
+  applicationSettings       ApplicationSetting[]
 
   @@map("organizations")
 }
@@ -270,21 +271,54 @@ model DocumentSequence {
   suffix          String   @default("")
   numericLength   Int      @default(6) @map("numeric_length")
   startNumber     BigInt   @default(1) @map("start_number")
+  /// FINANCIAL_YEAR: a new financial year's sequence restarts at 1. NEVER: it continues after the previous number.
+  resetPolicy     String   @default("FINANCIAL_YEAR") @map("reset_policy")
+  /// Inactive sequences keep their history but cannot allocate. Sequences are never deleted.
+  isActive        Boolean  @default(true) @map("is_active")
   /// Highest number allocated so far (0 = none). Numbers are never reused.
   lastNumber      BigInt   @default(0) @map("last_number")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   version         Int      @default(1)
 
-  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  location      BusinessLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict)
-  financialYear FinancialYear     @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  organization  Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  location      BusinessLocation?          @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  financialYear FinancialYear              @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  allocations   DocumentNumberAllocation[]
 
   // NOTE: PostgreSQL treats NULLs as distinct; a partial unique index in the migration
   // covers the (location IS NULL) case.
   @@unique([organizationId, locationId, financialYearId, documentType])
   @@index([organizationId])
   @@map("document_sequences")
+}
+
+/// Append-only ledger of every permanent document number ever issued. It is the record that a number was used (and
+/// for which document), makes allocation idempotent per document, and keeps formatted numbers immutable even if the
+/// sequence configuration (prefix, width) changes later. UPDATE and DELETE are blocked by triggers.
+model DocumentNumberAllocation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  sequenceId      String   @map("sequence_id") @db.Uuid
+  /// Stable machine code, e.g. INVOICE (denormalised from the sequence for the uniqueness rules below).
+  documentType    String   @map("document_type")
+  /// The raw counter value that was issued.
+  sequenceNumber  BigInt   @map("sequence_number")
+  /// The number exactly as printed on the document, frozen at allocation time.
+  formattedNumber String   @map("formatted_number")
+  /// Identity of the document being posted (its internal id). Re-requesting the same document returns the same number.
+  documentRef     String   @map("document_ref")
+  allocatedAt     DateTime @default(now()) @map("allocated_at") @db.Timestamptz(6)
+  correlationId   String?  @map("correlation_id")
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sequence     DocumentSequence @relation(fields: [sequenceId], references: [id], onDelete: Restrict)
+
+  @@unique([sequenceId, sequenceNumber])
+  @@unique([organizationId, documentType, formattedNumber])
+  @@unique([organizationId, documentType, documentRef])
+  @@index([organizationId, allocatedAt])
+  @@map("document_number_allocations")
 }
 
 model TaxCategory {

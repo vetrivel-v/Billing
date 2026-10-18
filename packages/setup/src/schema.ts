@@ -27,6 +27,17 @@ const locationShape = {
 };
 const warehouseShape = { code: text(30), name: text(100) };
 const financialYearShape = { startDate: text(10) };
+/** Optional document-numbering answers. Non-secret; shape only here (rules run at completion). */
+const numberingSchema = z.strictObject({
+  invoicePrefix: text(40).optional(),
+  invoiceStartNumber: z.int().optional(),
+  creditNotePrefix: text(40).optional(),
+  debitNotePrefix: text(40).optional(),
+  purchasePrefix: text(40).optional(),
+  paymentPrefix: text(40).optional(),
+  numericWidth: z.int().optional(),
+});
+
 const administratorIdentityShape = {
   username: text(64),
   displayName: text(100),
@@ -55,6 +66,7 @@ export const setupInputSchema = z.strictObject({
     .strictObject({ code: warehouseShape.code.optional(), name: warehouseShape.name.optional() })
     .optional(),
   financialYear: z.strictObject({ startDate: financialYearShape.startDate.min(1) }),
+  numbering: numberingSchema.optional(),
   administrator: z.strictObject({
     username: administratorIdentityShape.username.min(1),
     displayName: administratorIdentityShape.displayName.min(1),
@@ -94,6 +106,7 @@ export const setupDraftDataSchema = z.strictObject({
     .strictObject({ code: warehouseShape.code.optional(), name: warehouseShape.name.optional() })
     .optional(),
   financialYear: z.strictObject({ startDate: financialYearShape.startDate.optional() }).optional(),
+  numbering: numberingSchema.optional(),
   administrator: z
     .strictObject({
       username: administratorIdentityShape.username.optional(),
