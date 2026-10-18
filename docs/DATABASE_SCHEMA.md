@@ -108,6 +108,14 @@ All FKs use `ON DELETE RESTRICT` unless noted (history is never silently cascade
 - Existing rows receive `origin=USER`, `review_status=UNREVIEWED`, no effective dates (covered by a
   populated-database migration test). Seeded values are placeholders that require accountant review (ADR-0012).
 
+### 3.2 Changes in migration `20261018000000_task_1_3_auth_constraints` (Task 1.3)
+
+No table or column changes (`schema.prisma` unchanged). Constraints and a trigger only:
+`users_username_form_chk` (lower-case, trimmed, 3-64 chars; existing names are folded first and the migration
+aborts atomically on a collision), `sessions_token_hash_form_chk` (token_hash must be 64 lower-case hex, so a raw
+token cannot be stored), `sessions_expiry_chk` (expires_at > created_at), and trigger `users_no_delete`
+(users are disabled, never deleted).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

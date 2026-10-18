@@ -26,7 +26,8 @@
     "test:integration": "vitest run --project integration",
     "test:all": "vitest run",
     "build": "npm run build --workspaces --if-present",
-    "verify:phase0": "tsx scripts/verify-phase0.ts"
+    "verify:phase0": "tsx scripts/verify-phase0.ts",
+    "bench:password-hash": "tsx scripts/benchmark-password-hash.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

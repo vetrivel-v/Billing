@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
+import { createAuthService, type HasherLike, type PartialAuthConfig } from '@commercebill/auth';
 import { pingDatabase, type PrismaClient } from '@commercebill/database';
 import {
   APP_VERSION,
@@ -12,6 +13,8 @@ import {
   type HealthResponse,
 } from '@commercebill/shared-types';
 import type { AppEnv } from '@commercebill/validation';
+import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
+import { ApiHttpError } from './errors.js';
 import { LAUNCH_SECRET_HEADER, isExemptPath, launchSecretMatches } from './launch-secret.js';
 
 export interface AppDeps {
@@ -23,6 +26,17 @@ export interface AppDeps {
    * When set, every route except liveness requires the ${LAUNCH_SECRET_HEADER} header.
    */
   launchSecret?: string | undefined;
+  /** User authentication settings (ADR-0014). Defaults are secure; tests may override. */
+  auth?: {
+    config?: PartialAuthConfig;
+    hasher?: HasherLike;
+    clock?: () => Date;
+    allowWeakHashingForTests?: boolean;
+  };
+  /** Global request limiter. Default 300 requests per minute. */
+  globalRateLimit?: LoginRateLimit;
+  /** Per-route limit for POST /auth/login. Default 10 requests per minute. */
+  loginRateLimit?: LoginRateLimit;
   /** Test hook: capture structured logs. */
   logStream?: { write(msg: string): void } | undefined;
 }
@@ -60,7 +74,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
   // Coarse global limiter; stricter per-route limits (e.g. login) arrive in Phase 1.
-  await app.register(rateLimit, { max: 300, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: deps.globalRateLimit?.max ?? 300,
+    timeWindow: deps.globalRateLimit?.timeWindowMs ?? 60_000,
+  });
 
   const launchSecret = deps.launchSecret;
   if (launchSecret) {
@@ -96,6 +113,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   app.setErrorHandler((err: FastifyError, req, reply) => {
+    if (err instanceof ApiHttpError) {
+      // Expected, application-decided outcome (401/403/400/503): stable code, safe message, no internals.
+      req.log.info({ statusCode: err.statusCode, code: err.apiCode }, 'request rejected');
+      const known: ApiErrorBody = {
+        error: {
+          code: err.apiCode,
+          message: err.message,
+          dataSaved: false,
+          correlationId: req.id,
+        },
+      };
+      void reply.code(err.statusCode).send(known);
+      return;
+    }
     const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
     // Full detail goes to the server log only; clients get a stable code and correlation ID.
     req.log.error({ err }, 'request failed');
@@ -139,6 +170,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       database: { status: up ? 'ok' : 'down' },
     };
   });
+
+  if (deps.prisma) {
+    const authService = await createAuthService({
+      prisma: deps.prisma,
+      appVersion: APP_VERSION,
+      ...deps.auth,
+    });
+    app.decorate('authService', authService);
+    await registerAuthRoutes(app, {
+      loginRateLimit: deps.loginRateLimit ?? { max: 10, timeWindowMs: 60_000 },
+    });
+  }
 
   return app;
 }

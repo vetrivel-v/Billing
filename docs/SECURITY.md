@@ -43,8 +43,8 @@ reviewed in the diff.
 - [x] Error body has no internals
 - [x] Audit log UPDATE/DELETE/TRUNCATE rejected
 - [x] Electron navigation / external URL policy
-- [ ] Authentication / authorization / privilege escalation (Phase 1)
-- [ ] Rate limiting on login (Phase 1)
+- [x] Authentication, authorization and privilege-escalation tests (Task 1.3: forged/altered tokens, cross-user, cross-organization, role revocation, no admin bypass)
+- [x] Rate limiting and per-account lockout on login (Task 1.3; limiter is coarse on loopback, R-046)
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)
 - [x] IPC sender-URL validation and app:// path-traversal protection (Task 1.2)

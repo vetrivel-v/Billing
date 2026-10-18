@@ -65,3 +65,22 @@ export interface DesktopBridge {
 
 /** Application version reported by health checks until release tooling injects it (Phase 6). */
 export const APP_VERSION = '0.0.1';
+
+/** POST /auth/login success body. The token goes in the Authorization header of later requests. */
+export interface LoginResponse {
+  token: string;
+  expiresAt: string;
+  idleTimeoutSeconds: number;
+  mustChangePassword: boolean;
+  user: { id: string; username: string; displayName: string; organizationId: string };
+}
+
+/** GET /auth/me body: who the server believes the caller is, and what they may do. */
+export interface MeResponse {
+  user: { id: string; username: string; displayName: string; organizationId: string };
+  /** Stable permission keys (e.g. "sales.invoice.post"). Informational: the server enforces them. */
+  permissions: string[];
+  mustChangePassword: boolean;
+  sessionExpiresAt: string;
+  idleTimeoutSeconds: number;
+}
