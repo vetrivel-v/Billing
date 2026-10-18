@@ -1,6 +1,6 @@
 # ADR-0010: Shell-to-API authentication with a per-launch secret
 
-- Status: Accepted (guard implemented and tested; wiring into the Electron shell is requirement P1-SEC-01, which must land before any data-bearing API route)
+- Status: Accepted and implemented. Guard in Task 1.0; wired into the Electron shell in Task 1.2 (P1-SEC-01, ADR-0013)
 - Date: 2026-10-16
 - Resolves: risk R-032 (design); residual risk R-037
 
@@ -44,5 +44,4 @@ the secret value, bearer token and cookie never appear in logs.
   this is within the "local malware as the same user" case accepted in THREAT_MODEL.md.
 - Development without the Electron shell leaves the guard off. Production builds must always set it; this will
   be enforced by a production-mode requirement in env validation when the shell integration lands.
-- `main.ts` already passes `LAUNCH_SECRET` to the guard, but the Electron shell does not generate or supply it
-  yet (not wired; no end-to-end test of that path exists).
+- Wired in Task 1.2: the shell generates and supplies the secret and the renderer sends it (ADR-0013). User sessions are still pending (P1-AUTH-01).

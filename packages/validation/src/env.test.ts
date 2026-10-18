@@ -62,3 +62,22 @@ describe('LAUNCH_SECRET', () => {
     }
   });
 });
+
+describe('production requires the launch secret (P1-SEC-01)', () => {
+  it('rejects NODE_ENV=production without LAUNCH_SECRET', () => {
+    expect(() => parseEnv({ ...base, NODE_ENV: 'production' })).toThrow(
+      /LAUNCH_SECRET is required when NODE_ENV=production/,
+    );
+  });
+  it('accepts production with a valid secret, and development without one', () => {
+    expect(
+      parseEnv({ ...base, NODE_ENV: 'production', LAUNCH_SECRET: 'a'.repeat(64) }).NODE_ENV,
+    ).toBe('production');
+    expect(parseEnv({ ...base, NODE_ENV: 'development' }).LAUNCH_SECRET).toBeUndefined();
+  });
+  it('accepts the app:// renderer origin used by the Electron shell', () => {
+    expect(parseEnv({ ...base, WEB_ORIGIN: 'app://commercebill' }).WEB_ORIGIN).toEqual([
+      'app://commercebill',
+    ]);
+  });
+});

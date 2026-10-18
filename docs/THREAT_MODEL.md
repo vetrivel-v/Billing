@@ -23,24 +23,24 @@ internet integrations; no inbound LAN exposure by default); a stolen/lost comput
 
 ## Threats and controls
 
-| ID   | STRIDE                 | Threat                                            | Control (status)                                                                  |
-| ---- | ---------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| T-01 | Spoofing               | Local process calls the loopback API              | Per-launch secret + session auth (planned, R-032)                                 |
-| T-02 | Spoofing               | Brute-force login                                 | Argon2id, lockout, rate limit, failed-login audit (planned)                       |
-| T-03 | Tampering              | Modify posted documents                           | Immutability + reversal model (planned); DB triggers on posted tables (planned)   |
-| T-04 | Tampering              | Edit/delete audit events                          | Append-only triggers (implemented, tested)                                        |
-| T-05 | Tampering              | Malicious CSV/XLSX (formula injection, huge file) | Validation, size limits, escape on export (planned)                               |
-| T-06 | Tampering              | Path traversal in attachments/backups             | Random internal filenames, approved directory (planned)                           |
-| T-07 | Repudiation            | User denies an action                             | Audit log with user, correlation ID, before/after (table exists; writers planned) |
-| T-08 | Information disclosure | Secrets in logs/errors                            | Pino redaction, stable sanitized errors (implemented; leak test planned)          |
-| T-09 | Information disclosure | Backup stolen                                     | Encrypted backup archive (planned)                                                |
-| T-10 | Information disclosure | XSS in renderer reads data                        | React escaping, CSP, no remote content, context isolation (implemented baseline)  |
-| T-11 | Denial of service      | Request flood on loopback                         | Rate limit (implemented, coarse)                                                  |
-| T-12 | Denial of service      | Large import exhausts memory                      | Streaming parse, row limits (planned)                                             |
-| T-13 | Elevation              | Renderer compromise reaches Node/OS               | Sandbox, no nodeIntegration, minimal bridge, navigation lock (implemented)        |
-| T-14 | Elevation              | Privilege escalation between roles                | Server-side permission checks on every operation (planned)                        |
-| T-15 | Elevation              | Malicious dependency                              | Lockfile, audit, SBOM (partially: audit)                                          |
-| T-16 | Tampering              | Duplicate webhook/idempotency abuse               | Idempotency keys + unique constraints (planned)                                   |
+| ID   | STRIDE                 | Threat                                            | Control (status)                                                                   |
+| ---- | ---------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| T-01 | Spoofing               | Local process calls the loopback API              | Per-launch secret (implemented, tested end to end) + session auth (planned, R-032) |
+| T-02 | Spoofing               | Brute-force login                                 | Argon2id, lockout, rate limit, failed-login audit (planned)                        |
+| T-03 | Tampering              | Modify posted documents                           | Immutability + reversal model (planned); DB triggers on posted tables (planned)    |
+| T-04 | Tampering              | Edit/delete audit events                          | Append-only triggers (implemented, tested)                                         |
+| T-05 | Tampering              | Malicious CSV/XLSX (formula injection, huge file) | Validation, size limits, escape on export (planned)                                |
+| T-06 | Tampering              | Path traversal in attachments/backups             | Random internal filenames, approved directory (planned)                            |
+| T-07 | Repudiation            | User denies an action                             | Audit log with user, correlation ID, before/after (table exists; writers planned)  |
+| T-08 | Information disclosure | Secrets in logs/errors                            | Pino redaction, stable sanitized errors (implemented; leak test planned)           |
+| T-09 | Information disclosure | Backup stolen                                     | Encrypted backup archive (planned)                                                 |
+| T-10 | Information disclosure | XSS in renderer reads data                        | React escaping, CSP, no remote content, context isolation (implemented baseline)   |
+| T-11 | Denial of service      | Request flood on loopback                         | Rate limit (implemented, coarse)                                                   |
+| T-12 | Denial of service      | Large import exhausts memory                      | Streaming parse, row limits (planned)                                              |
+| T-13 | Elevation              | Renderer compromise reaches Node/OS               | Sandbox, no nodeIntegration, minimal bridge, navigation lock (implemented)         |
+| T-14 | Elevation              | Privilege escalation between roles                | Server-side permission checks on every operation (planned)                         |
+| T-15 | Elevation              | Malicious dependency                              | Lockfile, audit, SBOM (partially: audit)                                           |
+| T-16 | Tampering              | Duplicate webhook/idempotency abuse               | Idempotency keys + unique constraints (planned)                                    |
 
 ## Out of scope / accepted for now
 

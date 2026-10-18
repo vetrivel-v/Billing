@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@commercebill/shared-types": "^0.0.1",
+    "@commercebill/validation": "^0.0.1",
     "electron": "^44.8.0"
   }
 }

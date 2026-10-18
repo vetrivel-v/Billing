@@ -45,4 +45,15 @@ describe('StatusPanel', () => {
     renderPanel();
     await waitFor(() => expect(screen.getByTestId('api-status').textContent).toBe('Unreachable'));
   });
+
+  it('shows Not authorised (not Unreachable) when the API rejects the launch secret', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ error: { code: 'AUTH_0001' } }), { status: 401 }),
+      ),
+    );
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId('db-status').textContent).toBe('Not authorised'));
+  });
 });

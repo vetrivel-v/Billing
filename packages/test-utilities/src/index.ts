@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { createServer } from 'node:net';
 import EmbeddedPostgres from 'embedded-postgres';
 import pg from 'pg';
 
@@ -22,11 +23,28 @@ export interface TestCluster {
 }
 
 /** Start a throwaway PostgreSQL cluster in a temp directory (real PostgreSQL, isolated from dev data). */
-export async function startTestCluster(port: number = TEST_PG.port): Promise<TestCluster> {
+/** Ask the OS for a free loopback port, so a leftover cluster from an interrupted run cannot block this one. */
+function freePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, TEST_PG.host, () => {
+      const address = server.address();
+      server.close(() =>
+        typeof address === 'object' && address
+          ? resolvePort(address.port)
+          : reject(new Error('no port')),
+      );
+    });
+  });
+}
+
+export async function startTestCluster(port?: number): Promise<TestCluster> {
+  const chosenPort = port ?? (await freePort());
   const dir = mkdtempSync(join(tmpdir(), 'commercebill-pg-'));
   const server = new EmbeddedPostgres({
     databaseDir: dir,
-    port,
+    port: chosenPort,
     user: TEST_PG.user,
     password: TEST_PG.password,
     persistent: false,
@@ -38,7 +56,7 @@ export async function startTestCluster(port: number = TEST_PG.port): Promise<Tes
   await server.initialise();
   await server.start();
   return {
-    adminUrl: `postgresql://${TEST_PG.user}:${TEST_PG.password}@${TEST_PG.host}:${port}/postgres`,
+    adminUrl: `postgresql://${TEST_PG.user}:${TEST_PG.password}@${TEST_PG.host}:${chosenPort}/postgres`,
     async stop() {
       await server.stop();
       rmSync(dir, { recursive: true, force: true });

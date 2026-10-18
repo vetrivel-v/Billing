@@ -51,9 +51,16 @@ export interface DatabaseHealthResponse extends HealthResponse {
   database: { status: HealthStatus };
 }
 
-/** Bridge exposed by the Electron preload script (kept minimal by design). */
+/** How the renderer reaches the local API. The secret is generated per launch by the Electron shell. */
+export interface ApiAccess {
+  baseUrl: string;
+  secret: string;
+}
+
+/** Bridge exposed by the Electron preload script (kept minimal by design; argument-free methods only). */
 export interface DesktopBridge {
   getAppInfo(): Promise<{ name: string; version: string; platform: string }>;
+  getApiAccess(): Promise<ApiAccess>;
 }
 
 /** Application version reported by health checks until release tooling injects it (Phase 6). */

@@ -3,16 +3,42 @@
  * without launching Electron.
  */
 
+/** Custom scheme that serves the built renderer. A real (non-null) origin lets the API enforce CORS. */
+export const APP_SCHEME = 'app';
+export const APP_HOST = 'commercebill';
+export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
+
+/** `new URL('app://x').origin` is the opaque string "null" for custom schemes, so compare parts. */
+function isAppUrl(u: URL): boolean {
+  return u.protocol === `${APP_SCHEME}:` && u.host === APP_HOST;
+}
+
+function isDevServerUrl(u: URL, devServerUrl?: string): boolean {
+  return Boolean(devServerUrl) && u.origin === new URL(devServerUrl as string).origin;
+}
+
 /** Origins that privileged windows may load. The dev server is allowed only when not packaged. */
 export function isAllowedNavigation(url: string, devServerUrl?: string): boolean {
   try {
     const u = new URL(url);
-    if (u.protocol === 'file:') return true;
-    if (devServerUrl) return u.origin === new URL(devServerUrl).origin;
-    return false;
+    return isAppUrl(u) || isDevServerUrl(u, devServerUrl);
   } catch {
     return false;
   }
+}
+
+/**
+ * Only the application's own pages may call privileged IPC channels (Electron security guidance:
+ * validate the sender of every IPC message). Unknown or missing sender URLs are rejected.
+ */
+export function isTrustedSender(senderUrl: string | undefined, devServerUrl?: string): boolean {
+  if (!senderUrl) return false;
+  return isAllowedNavigation(senderUrl, devServerUrl);
+}
+
+/** The browser origin the API must allow through CORS for this run. */
+export function rendererOrigin(devServerUrl?: string): string {
+  return devServerUrl ? new URL(devServerUrl).origin : APP_ORIGIN;
 }
 
 const EXTERNAL_LINK_ALLOWLIST = new Set<string>(['https://wa.me']);

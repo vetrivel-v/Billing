@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchDbHealth, fetchHealth } from './api.js';
+import { ApiRequestError, fetchDbHealth, fetchHealth } from './api.js';
+
+function describeFailure(error: unknown): string {
+  return error instanceof ApiRequestError && error.status === 401
+    ? 'Not authorised'
+    : 'Unreachable';
+}
 
 export function StatusPanel() {
   const api = useQuery({ queryKey: ['health'], queryFn: fetchHealth, retry: false });
@@ -11,11 +17,19 @@ export function StatusPanel() {
       <dl className="grid grid-cols-[10rem_1fr] gap-y-1">
         <dt>API</dt>
         <dd data-testid="api-status">
-          {api.isPending ? 'Checking...' : api.isError ? 'Unreachable' : api.data.status}
+          {api.isPending
+            ? 'Checking...'
+            : api.isError
+              ? describeFailure(api.error)
+              : api.data.status}
         </dd>
         <dt>Database</dt>
         <dd data-testid="db-status">
-          {db.isPending ? 'Checking...' : db.isError ? 'Unreachable' : db.data.database.status}
+          {db.isPending
+            ? 'Checking...'
+            : db.isError
+              ? describeFailure(db.error)
+              : db.data.database.status}
         </dd>
         <dt>Version</dt>
         <dd>{api.data?.version ?? '-'}</dd>

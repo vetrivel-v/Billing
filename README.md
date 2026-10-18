@@ -28,7 +28,11 @@ In another terminal, with `npm run dev` running:
 ```bash
 curl http://127.0.0.1:4310/health        # API health
 curl http://127.0.0.1:4310/health/db     # database health
-npm run build && npm run start -w @commercebill/desktop    # Electron shell (loads the built web app)
+npm run build
+# Electron shell: starts the built API itself with a per-launch secret and serves the web app from app://
+# DATABASE_URL must point at a migrated database (e.g. the one from `npm run dev` / `npm run db:start`).
+# In PowerShell set it first:  $env:DATABASE_URL = "postgresql://..."  (then run only the npm command)
+DATABASE_URL="postgresql://commercebill:commercebill_dev@127.0.0.1:54329/commercebill_dev" npm run start -w @commercebill/desktop
 ```
 
 Optional: `docker compose up -d` provides PostgreSQL instead of the embedded one (same port and credentials).
