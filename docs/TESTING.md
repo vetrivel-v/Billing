@@ -20,6 +20,16 @@ their first test exists.
 - Mocks and sandbox adapters must be labelled as such in code and reports.
 - Tests that need the database must use `createIsolatedDatabase`; never run against the development database.
 
+## Gate integrity (R-039)
+
+On Windows the integration run once exited 0 although a test had failed. `tests/integration/global-setup.ts`
+re-asserts the failing exit code, and `scripts/verify-phase0.ts` runs the unit and integration gates with
+`--reporter=json` and fails the gate if the report is missing, empty or contains any failed test. Never judge a
+gate by the exit code alone; read the printed "Tests" line.
+
+Additional directories now in use: `tests/unit` (catalogue checks), `tests/migration` (migration tests),
+`tests/recovery` (backup spike), `tests/security` (Argon2 spike).
+
 ## Gate sequence
 
 `npm run verify:phase0` runs: schema validate, client generate, type-check, lint, format check, unit,

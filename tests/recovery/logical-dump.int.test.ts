@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import pg from 'pg';
 import { createIsolatedDatabase, type IsolatedDatabase } from '@commercebill/test-utilities';
@@ -9,6 +11,16 @@ import {
   importLogical,
   type LogicalDump,
 } from './spikes/logical-dump.js';
+
+/** Newest migration directory = the schema version every freshly migrated database must report. */
+function latestMigrationName(): string {
+  const dir = resolve(import.meta.dirname, '..', '..', 'prisma', 'migrations');
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort()
+    .at(-1)!;
+}
 
 let source: IsolatedDatabase;
 let dump: LogicalDump;
@@ -76,7 +88,7 @@ afterAll(async () => {
 describe('R-031 spike: logical dump and restore without pg_dump', () => {
   it('exports a manifest with schema version, row counts and checksums', () => {
     expect(dump.manifest.format).toBe('commercebill-logical-dump/1');
-    expect(dump.manifest.schemaVersion).toBe('20261016000000_phase0_foundation');
+    expect(dump.manifest.schemaVersion).toBe(latestMigrationName());
     const counts = Object.fromEntries(dump.manifest.tables.map((t) => [t.name, t.rows]));
     expect(counts).toMatchObject({
       organizations: 1,

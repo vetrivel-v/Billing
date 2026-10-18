@@ -3,7 +3,7 @@
 Source of truth: [`prisma/schema.prisma`](../prisma/schema.prisma) and `prisma/migrations/`.
 Conventions: [DATABASE_CONVENTIONS.md](DATABASE_CONVENTIONS.md).
 
-**Implemented in Phase 0 (18 tables):** the Foundation domain only. All other domains below are
+**Implemented (18 tables since Phase 0; Task 1.1 added columns only):** the Foundation domain only. All other domains below are
 _designed_ (names and relationships reserved from spec section 34) and are created by the phase that owns
 them. Nothing in this file about an unimplemented domain should be read as existing code.
 
@@ -99,6 +99,14 @@ All FKs use `ON DELETE RESTRICT` unless noted (history is never silently cascade
 | units                 | `organization_id`                                 | UQ (org, code); CK decimal_places 0-4                                                                                                                                                            | `is_active`                | -                                                                            |
 | audit_logs            | `organization_id` (nullable for pre-setup events) | Append-only: row triggers block UPDATE/DELETE, statement trigger blocks TRUNCATE; indexes (org, occurred_at), (entity_type, entity_id), (user, occurred_at)                                      | never                      | Retention policy decided with an accountant; archival must itself be audited |
 | application_settings  | `organization_id` nullable                        | UQ (org, key) + partial UQ for global keys                                                                                                                                                       | no                         | -                                                                            |
+
+### 3.1 Changes in migration `20261017000000_task_1_1_tax_reference_markers` (Task 1.1)
+
+- `tax_categories`: + `effective_from`, `effective_to` (nullable dates; CK `effective_to >= effective_from`),
+  `origin` (`USER` | `REFERENCE_SEED`), `review_status` (`UNREVIEWED` | `REVIEWED`), `review_note`.
+- `tax_rates`: + `origin`, `review_status`, `review_note` (same checks).
+- Existing rows receive `origin=USER`, `review_status=UNREVIEWED`, no effective dates (covered by a
+  populated-database migration test). Seeded values are placeholders that require accountant review (ADR-0012).
 
 ## 4. Relationship explanation
 

@@ -36,14 +36,15 @@ Copy `.env.example` to `.env` to override defaults.
 
 ## Verification commands
 
-| Command                                 | What it does                                                                        |
-| --------------------------------------- | ----------------------------------------------------------------------------------- |
-| `npm run typecheck`                     | Strict TypeScript across all workspaces                                             |
-| `npm run lint` / `npm run format:check` | ESLint / Prettier                                                                   |
-| `npm test`                              | Unit tests (Vitest)                                                                 |
-| `npm run test:integration`              | Integration tests against an isolated throwaway PostgreSQL, applying all migrations |
-| `npm run build`                         | Builds API (tsup), web (Vite) and desktop (tsup)                                    |
-| `npm run verify:phase0`                 | Runs every Phase 0 gate and prints PASS/FAIL                                        |
+| Command                                 | What it does                                                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                     | Strict TypeScript across all workspaces                                                                                                                 |
+| `npm run lint` / `npm run format:check` | ESLint / Prettier                                                                                                                                       |
+| `npm test`                              | Unit tests (Vitest)                                                                                                                                     |
+| `npm run test:integration`              | Integration tests against an isolated throwaway PostgreSQL, applying all migrations                                                                     |
+| `npm run build`                         | Builds API (tsup), web (Vite) and desktop (tsup)                                                                                                        |
+| `npm run verify:phase0`                 | Runs every Phase 0 gate and prints PASS/FAIL                                                                                                            |
+| `npm run db:seed -- reference`          | Insert reference data (permissions, role templates, units, UNREVIEWED placeholder tax rates) for the single existing organization; `-- demo` is a no-op |
 
 ## Documentation
 

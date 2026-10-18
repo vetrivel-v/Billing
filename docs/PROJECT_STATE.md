@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-16 (after Phase 1 Task 1.0). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-18 (after Phase 1 Task 1.1). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                         |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                           |
-| Current phase             | **Phase 1 in progress: Task 1.0 complete; Task 1.1 not started**                                                                              |
-| Current database version  | `20261016000000_phase0_foundation` (18 tables; Task 1.0 made no schema change, so no new migration)                                           |
-| Last successful migration | `20261016000000_phase0_foundation` - applied to a clean database by the integration run and to the dev database on 2026-10-16                 |
-| Last successful build     | 2026-10-16 - `npm run build` (api, web, desktop) PASS                                                                                         |
-| Last successful test run  | 2026-10-16 - `npm run verify:phase0` all 8 gates PASS; 47 unit + 16 integration tests (63) passed; coverage 99.0% statements / 96.8% branches |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance-doc corrections made after that commit are uncommitted                   |
-| Release status            | Not releasable. No product functionality exists                                                                                               |
+| Item                      | Value                                                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                   |
+| Current phase             | **Phase 1 in progress: Tasks 1.0 and 1.1 complete; Task 1.2 not started**                                                                                                             |
+| Current database version  | `20261017000000_task_1_1_tax_reference_markers` (18 tables; Task 1.1 added review/effective-date columns to tax_categories and tax_rates)                                             |
+| Last successful migration | `20261017000000_task_1_1_tax_reference_markers` - applied to clean databases by every integration file and to a populated previous-version database by the migration test, 2026-10-18 |
+| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                 |
+| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 52 unit + 45 integration tests (97) passed; coverage 99.0% statements / 96.8% branches; npm audit 0 vulnerabilities            |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = the commit following `8e81d9e` (see `git log`); no remote configured                |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                       |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -27,6 +27,21 @@ the completion report.
 - ADR-0011 Argon2id via @node-rs/argon2 (proven in Node 24.16 and Electron 44.8.0).
 - Defect found and fixed (also recorded in RISK_REGISTER R-035, REQUIREMENTS_MATRIX T10-05, DATABASE_CONVENTIONS rule 13, and the Task 1.0 report): dev/test PostgreSQL clusters defaulted to WIN1252 and could not store Indian-language
   text (R-035); both are now forced to UTF8 with a regression test.
+
+## Task 1.1 results (reference seed; see docs/PHASE_1_TASK_1_1_COMPLETION_REPORT.md, ADR-0012)
+
+- `npm run db:seed -- reference` inserts, in one transaction and idempotently (insert-if-absent, never
+  delete/recreate): 70 permissions, 5 role templates with 162 grants (Administrator 70, Accountant 42, Billing Operator 14, Warehouse Operator 12, Viewer/Auditor 24), 13 units, 8 tax categories and 8 tax rates
+  for an existing organization. `demo` stays a no-op. Counts are asserted in tests.
+- Migration `20261017000000_task_1_1_tax_reference_markers`: origin / review_status / review_note on tax
+  categories and rates, effective dating on categories. Seeded tax data are **UNREVIEWED placeholders, not
+  statutory rates**; enforcement of review status in invoicing is not built (R-040).
+- **Gate-integrity defect found and fixed (R-039):** the integration run exited 0 although a test had failed, so
+  `verify:phase0` printed a false PASS once. Teardown now re-asserts the exit code and the gate cross-checks the
+  Vitest JSON report; a negative control proved both. A Task 1.0 test that hard-coded the schema version was the
+  failing test and now derives the newest migration name.
+- Known behaviours: re-running the seed re-adds revoked template grants (R-042); seeding writes no audit row
+  (R-041).
 
 ## In-progress modules
 
@@ -52,7 +67,7 @@ No critical defect known. Open risks needing design decisions before/at Phase 1:
 
 None known. Migration safety (pre-migration backup, upgrade tests) is not implemented yet (R-010).
 
-## Carried-forward obligations from Task 1.0 (must not be lost)
+## Carried-forward obligations (from Task 1.0; still open after Task 1.1)
 
 | ID         | Obligation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Must be done by                                                                                                                                                                        | Tracked in                                                   |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -80,36 +95,26 @@ None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp in
 
 ## Exact next task
 
-**Phase 1, Task 1.1 - reference seed.** Implement `prisma/seed/reference` and wire `prisma/seed/seed.ts`
-(mode `reference`) to insert, idempotently and inside one transaction: the permission catalogue (stable keys such
-as `sales.invoice.post`); the five predefined role templates (Administrator, Accountant, Billing Operator,
-Warehouse Operator, Viewer/Auditor; spec section 11) with their role-permission mappings; default units; and tax
-categories with effective-dated rates that are clearly flagged as requiring accountant review. Per-organization
-rows are created for an existing organization only (the setup wizard comes later); global rows (permissions)
-are seeded once. Add integration tests (idempotent re-run, no duplicate rows, role matrix matches spec section
-11, warehouse operator has no cost/margin/accounting permission, viewer has no write permission). If a schema
-change is needed, add a versioned migration and a migration test. Do not start authentication (Task 1.2+),
-and do not recreate any Phase 0 or Task 1.0 module.
+**Phase 1, Task 1.2 - Electron shell supervises the API and supplies the launch secret (requirement P1-SEC-01).**
+Proposed scope (not started; do not begin without approval):
 
-### Task 1.1 acceptance criteria
+1. The Electron main process generates 32 random bytes per launch, starts the built API bundle as a child
+   process on 127.0.0.1 passing `LAUNCH_SECRET` (and the other validated env values) **through the environment
+   only**, waits for `/health`, and stops the child on quit. The secret is never written to disk, argv or logs.
+2. The preload exposes one new method (e.g. `getApiAccess()`) returning only the API base URL and the secret;
+   it accepts no arguments and is covered by a security test; `DesktopBridge` type updated.
+3. The web client sends `x-commercebill-launch-secret` on every API call (except `/health`) and shows a clear
+   state when the API is unreachable or rejects the secret.
+4. Env validation refuses to start the API in `NODE_ENV=production` without `LAUNCH_SECRET` (unit test).
+5. Automated test (Electron smoke, extending `ELECTRON_SMOKE`): the renderer's authorised call to
+   `/health/db` succeeds; the same call without the secret returns 401 `AUTH_0001`; the secret value does not
+   appear in the API's log output.
+6. All existing tests still pass: `npm run verify:phase0` (52 unit + 45 integration baseline, none weakened,
+   gate-integrity checks intact); coverage thresholds unchanged and met.
+7. No new data-bearing API route, authentication UI, session logic, backup code or business feature is added.
+8. PROJECT_STATE, REQUIREMENTS_MATRIX (P1-SEC-01 -> Tested), RISK_REGISTER (R-032/R-037) updated; Task 1.2
+   completion report written; ADR-0010 status updated to "implemented and wired".
 
-1. `npm run db:seed -- reference` (or `tsx prisma/seed/seed.ts reference`) completes against a freshly migrated
-   database and inserts the permission catalogue, the five role templates with role-permission mappings,
-   default units and tax categories/rates for an existing organization.
-2. The seed is **idempotent**: running it twice leaves identical row counts and no duplicates; it runs in one
-   transaction (failure part-way inserts nothing).
-3. The role matrix matches spec section 11: Administrator has every permission; Warehouse Operator has **no**
-   cost, margin or accounting permission; Billing Operator has no period-unlock, posted-document deletion or
-   integration-credential permission; Viewer/Auditor has no write permission and export only if separately
-   granted; Accountant has no security-administration permission.
-4. Tax categories/rates are effective-dated, use exact decimals, and are flagged as requiring review by an
-   authorised accountant (no claim of statutory correctness).
-5. No demo data is inserted; `demo` mode remains a no-op.
-6. Integration tests cover criteria 1-5 and pass; any schema change has a versioned migration and a migration
-   test (none is expected).
-7. `npm run verify:phase0` still passes (47 unit + 16 integration tests as baseline, none weakened); coverage
-   thresholds unchanged and met.
-8. PROJECT_STATE, REQUIREMENTS_MATRIX and RISK_REGISTER updated and a Task 1.1 completion report written.
-
-Out of scope for Task 1.1: authentication, launch-secret wiring (P1-SEC-01), production backup (P1-BKP-01),
-any invoice, inventory, payment or accounting behaviour.
+Other open Phase 1 work, in no committed order: P1-AUTH-01 (password service, sessions, RBAC enforcement),
+setup wizard, P1-BKP-01 (production backup), numbering service, tax engine, customers/products/inventory,
+invoicing, PDF, payments, reports, import/export.
