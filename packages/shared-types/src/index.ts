@@ -11,6 +11,8 @@ export const ErrorCodes = {
   UNAUTHENTICATED: 'AUTH_0001',
   FORBIDDEN: 'AUTH_0002',
   RATE_LIMITED: 'AUTH_0003',
+  /** Authenticated, but the account must change its password first (ADR-0017). */
+  PASSWORD_CHANGE_REQUIRED: 'AUTH_0004',
   // Integration errors
   INTEGRATION_FAILED: 'INT_0001',
   // Database errors

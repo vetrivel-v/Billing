@@ -46,6 +46,9 @@ reviewed in the diff.
 - [x] Authentication, authorization and privilege-escalation tests (Task 1.3: forged/altered tokens, cross-user, cross-organization, role revocation, no admin bypass)
 - [x] Rate limiting and per-account lockout on login (Task 1.3; limiter is coarse on loopback, R-046)
 - [x] Bootstrap routes: launch secret, database-authoritative precondition under advisory lock, rate limits, no session, no secret in draft/logs/audit, value-free validation errors (Task 1.4). They are the ONLY routes exempt from user authentication; every future business route must use requireAuthenticatedUser + requirePermission
+- [x] User administration (Task 1.6): all routes behind launch secret + session + exact permission key; ceiling on role grants/revokes and on password-reset targets; no self role change; create-with-roles needs security.role.manage; organization taken from the session; cross-organization targets are 404 and cross-organization roles the same 400 as unknown roles
+- [x] Password change/reset (Task 1.6): current password required, wrong one is 400 and counts toward lockout, policy and reuse checks, Argon2id, other sessions revoked, no password material in responses, logs or audit
+- [x] Forced password change enforced (AUTH_0004); last usable administrator protected by the database for every path, including concurrency
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)
 - [x] IPC sender-URL validation and app:// path-traversal protection (Task 1.2)

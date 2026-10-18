@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-18 (after Phase 1 Task 1.5). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-18 (after Phase 1 Task 1.6). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                     |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.5 complete; Task 1.6 not started**                                                                                                                                                                                   |
-| Current database version  | `20261020000000_task_1_5_document_numbering` (19 tables: Task 1.5 added `document_number_allocations`, two columns on `document_sequences`, constraints and triggers)                                                                                   |
-| Last successful migration | `20261020000000_task_1_5_document_numbering` - applied to clean databases by every integration file and to populated previous-version databases by the migration tests, 2026-10-18                                                                      |
-| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                   |
-| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 246 unit + 215 integration tests (461) passed; coverage 97.0% statements / 93.0% branches / 99.1% functions / 98.5% lines; npm audit 0 vulnerabilities                                           |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                         |
+| Item                      | Value                                                                                                                                                                                                                                                                         |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                           |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.6 complete; Task 1.7 not started**                                                                                                                                                                                                         |
+| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                  |
+| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                      |
+| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                         |
+| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 251 unit + 276 integration tests (527) passed; coverage 96.5% statements / 92.0% branches / 98.9% functions / 98.2% lines (thresholds 80/70/80/80 unchanged)                                                           |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                               |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -119,6 +119,35 @@ the completion report.
 - Mutation checks: removing the row lock failed 4 concurrency tests; removing the idempotency and active checks failed
   5; a combined mutation that also skips a number each time failed 16 (the skip is rejected by the database trigger). Source restored and verified identical.
 
+## Task 1.6 results (user administration and password management; see docs/PHASE_1_TASK_1_6_COMPLETION_REPORT.md, ADR-0017)
+
+- Ten routes behind the launch secret and the Task 1.3 guards: `GET /auth/me` (existing), `POST /auth/change-password`,
+  `GET /roles`, `GET /users`, `GET /users/:id`, `POST /users`, `POST /users/:id/disable`, `/enable`,
+  `PUT /users/:id/roles`, `POST /users/:id/reset-password`. Every one is organization-scoped from the session.
+- Password change: authenticated only (no catalogue key); wrong current password is 400 `VAL_0001`
+  `current_password_incorrect` (not 401), counts toward lockout and is rate limited; reuse of the current password is
+  refused; revokes the caller's OTHER sessions and keeps the current one; clears the forced-change flag.
+- Forced change enforced (`AUTH_0004`): a user on a temporary password may only call `/auth/me`,
+  `/auth/change-password`, `/auth/logout`. 401 still precedes it.
+- Administrator password reset: the administrator supplies the temporary password; the server never generates or
+  returns one; the target's sessions are revoked, lockout cleared, change forced.
+- Role-assignment safeguards: (a) privilege ceiling - roles granted OR revoked must be within the caller's own
+  permissions; (b) no changing your own roles; (c) `POST /users` with non-empty `roleIds` also needs
+  `security.role.manage`. **Addition beyond the approved plan:** the same ceiling applies to reset-password
+  (the target's effective permissions must be within the caller's), otherwise a reset-only holder could take over an
+  Administrator. Flagged in the report for review.
+- Last-usable-administrator protection is in PostgreSQL (migration `20261021000000`): deferred constraint triggers on
+  `users`, `user_roles`, `role_permissions`, `roles`, `permissions` plus an advisory lock per organization, so
+  concurrent removals of different administrators cannot both commit. Organizations whose setup is not complete are
+  exempt (R-060). The service takes the same lock early and returns 409 instead of a failed commit.
+- The brief wrote `security.role_manage`; the real catalogue key is `security.role.manage` (used throughout).
+- Tests: +5 unit (privilege ceiling), +8 migration, +53 HTTP integration (every route: no session, no launch secret,
+  each other role template, exact-key custom role; escalation attempts; password flows; forced change; reset; disable/
+  enable; role assignment; last administrator including concurrent mutual disable; cross-organization isolation;
+  secret leakage). Mutation checks (ceiling, own-role rule, role.manage-on-create, pending-change enforcement, revoke-others,
+  organization scope) each made a test fail; sources restored and verified identical. Removing only the service-level
+  copy of the role.manage-on-create check does not fail a test because the route enforces it first (defence in depth).
+
 ## In-progress modules
 
 None.
@@ -145,18 +174,18 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 ## Carried-forward obligations (still open after Task 1.3)
 
-| ID         | Obligation                                                                                                                                                                                                                                         | Must be done by                           | Tracked in                                                   |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
-| P1-SEC-01  | ~~Wire the launch secret into Electron~~ **DONE in Task 1.2** (tested end to end; ADR-0013)                                                                                                                                                        | done                                      | REQUIREMENTS_MATRIX P1-SEC-01                                |
-| P1-BKP-01  | Production backup/restore module (streaming COPY, AES-256-GCM encryption, attachments, config, retention, verification workflow, restore wizard). The Task 1.0 logical-dump code is an **experimental spike, not production backup functionality** | Phase 1 backup task (before Phase 1 exit) | REQUIREMENTS_MATRIX P1-BKP-01; ADR-0009; R-011, R-031, R-036 |
-| P1-AUTH-01 | **Foundation DONE in Task 1.3** (Argon2id service, sessions, lockout, RBAC guards; ADR-0014). Still open: password change/reset, user-management routes, enforcement of `must_change_password`, login UI                                           | Later Phase 1 tasks                       | REQUIREMENTS_MATRIX P1-AUTH-01; R-047, R-048                 |
-| P6-ENC-01  | Production PostgreSQL initialisation must use `--encoding=UTF8` (dev/test already do)                                                                                                                                                              | Phase 6 packaging                         | REQUIREMENTS_MATRIX P6-ENC-01; R-035                         |
+| ID         | Obligation                                                                                                                                                                                                                                                                | Must be done by                           | Tracked in                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| P1-SEC-01  | ~~Wire the launch secret into Electron~~ **DONE in Task 1.2** (tested end to end; ADR-0013)                                                                                                                                                                               | done                                      | REQUIREMENTS_MATRIX P1-SEC-01                                |
+| P1-BKP-01  | Production backup/restore module (streaming COPY, AES-256-GCM encryption, attachments, config, retention, verification workflow, restore wizard). The Task 1.0 logical-dump code is an **experimental spike, not production backup functionality**                        | Phase 1 backup task (before Phase 1 exit) | REQUIREMENTS_MATRIX P1-BKP-01; ADR-0009; R-011, R-031, R-036 |
+| P1-AUTH-01 | **DONE through Task 1.6** (Argon2id service, sessions, RBAC guards, password change/reset, forced change, user and role administration; ADR-0014, ADR-0017). Still open: login UI, audit-log read API and auditing of permission denials (R-063), role/permission editing | Later Phase 1 tasks                       | REQUIREMENTS_MATRIX P1-AUTH-01; R-055, R-063                 |
+| P6-ENC-01  | Production PostgreSQL initialisation must use `--encoding=UTF8` (dev/test already do)                                                                                                                                                                                     | Phase 6 packaging                         | REQUIREMENTS_MATRIX P6-ENC-01; R-035                         |
 
 ## Known limitations
 
 - **The backup code under tests/recovery/spikes is an experimental spike (in-memory, unencrypted, same schema version only). No production backup or restore exists.**
 - The launch secret is enforced only when the shell (or a test) supplies `LAUNCH_SECRET`; running the API alone in development (`npm run dev`) leaves the guard off. Production mode refuses to start without it.
-- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). The auth guards otherwise protect only test-only routes: no normal business route exists yet. There is no login UI, password change/reset or user-management API (R-047, R-048).
+- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). Apart from the Task 1.6 user-administration routes, only test-only routes use the guards: no business route exists yet. Task 1.6 added the user-administration and password routes; there is still no login UI.
 - Docker Compose file was not executed (Docker not installed on this machine).
 - Electron smoke check and `npm run dev` startup were verified manually, not in the automated suite.
 - No Playwright, no pre-commit hook, no CI service, no OpenAPI document, no SBOM yet.
@@ -171,46 +200,28 @@ None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp in
 
 ## Exact next task
 
-**Phase 1, Task 1.6 - authenticated user administration and password change API (first routes that use both guards).**
-Proposed scope (not started; do not begin without approval). No requirement IDs yet: assign T16-xx at the start.
+**Phase 1, Task 1.7 - audit-log read API and auditing of authorization denials.** Proposed (not started; do not begin
+without approval). Requirement IDs T17-xx are assigned at the start.
 
-Why this task: every route so far is either liveness, bootstrap (no user can exist) or authentication itself. Task 1.6
-adds the first ordinary business-administration routes, which must demonstrate the pattern all later routes follow
-(`requireAuthenticatedUser` + `requirePermission(key)`), and closes R-047, R-048 and R-055.
+Why: Task 1.6 writes security audit events (`user.create`, `user.disable`, `user.enable`, `user.roles.changed`,
+`user.password.changed`, `user.password.reset`, `user.password.change_failed`) but nothing can read them, and a 403 is
+only logged, not audited (R-063). `security.audit.read` exists in the catalogue (Viewer/Auditor holds it).
 
 Scope:
 
-1. **Password change (own account):** `POST /auth/change-password` (authenticated; current password required;
-   new password checked against the policy; rejects reuse of the current password; revokes the caller's OTHER
-   sessions; clears `must_change_password`; audited without password material).
-2. **Enforce `must_change_password`:** while set, every authenticated route except `GET /auth/me`,
-   `POST /auth/change-password` and `POST /auth/logout` answers 403 with a stable code (e.g. `AUTH_0004`
-   password change required). `/auth/me` reports the flag.
-3. **User administration routes** (permission keys from the Task 1.1 catalogue, no new hidden bypass):
-   - `GET /users` and `GET /users/:id` -> `security.user.read`
-   - `POST /users` (create with an initial password and role assignment; sets `must_change_password`) -> `security.user.manage`
-   - `POST /users/:id/disable` and `/enable` -> `security.user.manage` (disable revokes sessions; a user cannot disable
-     themselves; the last active Administrator cannot be disabled)
-   - `POST /users/:id/reset-password` (administrator-assisted: sets a temporary password, `must_change_password`,
-     revokes all of that user's sessions, clears lockout) -> `security.user.reset_password`
-   - `PUT /users/:id/roles` -> `security.role.manage` (cannot remove the last Administrator's Administrator role)
-     Every route is organization-scoped (a user of one organization can never read or change another's users) and
-     returns no password hash, token or secret.
-4. **Tests (acceptance criteria):** for each route, 401 without a session, 403 for each of the other four role
-   templates that lack the key, 200/201 for the permitted role; organization isolation; last-Administrator and
-   self-disable protections; forced password change flow end to end (create -> login -> blocked -> change ->
-   allowed); reset-password invalidates old sessions and password; old sessions rejected after change; audit events
-   exist and contain no secrets; passwords and tokens never in logs or responses; concurrent role/disable changes
-   cannot remove the last Administrator (database-level protection, not only a check); rate limiting on
-   change-password; migration + migration test if a schema change is needed (a trigger protecting the last
-   Administrator is the expected candidate).
-5. Out of scope: any UI, e-mail/self-service "forgot password" flows, MFA, role/permission editing, customers/products
-   or any other business route, the setup wizard screens.
-6. `npm run verify:phase0` still passes (246 unit + 215 integration baseline, none weakened, gate-integrity checks
-   intact); coverage thresholds unchanged and met. Task 1.3 auth, Task 1.4 setup and Task 1.5 numbering tests must
-   keep passing.
-7. PROJECT_STATE, REQUIREMENTS_MATRIX, RISK_REGISTER updated (R-047, R-048, R-055); an ADR for the decisions; a
-   Task 1.6 completion report.
+1. `GET /audit-logs` (`security.audit.read`): organization-scoped, keyset or limit/offset paging (limit <= 100), filters
+   by action, entity type/id, user and time range; returns no secret material; response shape documented.
+2. Record authorization denials (`auth.permission.denied`: user, route pattern, permission key, correlation id;
+   rate-limited or aggregated so a denied-request flood cannot flood the table - R-049 interaction) and AUTH_0004
+   blocks if wanted.
+3. Redaction check: a test that scans every audit row type for password material, hashes and tokens.
+4. Out of scope: any UI, export, retention/archival, hash chaining (R-017), role/permission editing, business routes.
+
+Acceptance criteria: 401 without a session; 403 for every role without `security.audit.read`; organization isolation
+(Org A cannot read Org B rows); paging bounds and invalid-query 400s; denial events created exactly once per denied
+request and containing no request body; audit rows stay append-only; `npm run verify:phase0` passes with the 527-test
+baseline not weakened and thresholds unchanged; PROJECT_STATE, REQUIREMENTS_MATRIX, RISK_REGISTER, an ADR and a
+completion report updated.
 
 Other open Phase 1 work, in no committed order: login/setup UI, P1-BKP-01 (production backup), tax engine,
 customers/products/inventory, invoicing, PDF, payments, reports, import/export.

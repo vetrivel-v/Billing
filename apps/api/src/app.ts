@@ -15,6 +15,7 @@ import {
 } from '@commercebill/shared-types';
 import type { AppEnv } from '@commercebill/validation';
 import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
+import { registerUserRoutes } from './user-routes.js';
 import { registerSetupRoutes } from './setup-routes.js';
 import { ApiHttpError } from './errors.js';
 import { LAUNCH_SECRET_HEADER, isExemptPath, launchSecretMatches } from './launch-secret.js';
@@ -39,6 +40,9 @@ export interface AppDeps {
   globalRateLimit?: LoginRateLimit;
   /** Per-route limit for POST /auth/login. Default 10 requests per minute. */
   loginRateLimit?: LoginRateLimit;
+  /** Per-route limits: POST /auth/change-password (default 5/min) and the admin password reset (default 10/min). */
+  changePasswordRateLimit?: LoginRateLimit;
+  resetPasswordRateLimit?: LoginRateLimit;
   /** First-run setup (ADR-0015). Rate limits default to 5/min for completion and 60/min for draft saves. */
   setup?: {
     completeRateLimit?: LoginRateLimit;
@@ -190,6 +194,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     app.decorate('authService', authService);
     await registerAuthRoutes(app, {
       loginRateLimit: deps.loginRateLimit ?? { max: 10, timeWindowMs: 60_000 },
+      ...(deps.changePasswordRateLimit
+        ? { changePasswordRateLimit: deps.changePasswordRateLimit }
+        : {}),
+    });
+    await registerUserRoutes(app, {
+      ...(deps.resetPasswordRateLimit
+        ? { resetPasswordRateLimit: deps.resetPasswordRateLimit }
+        : {}),
     });
     const setupService = createSetupService({
       prisma: deps.prisma,

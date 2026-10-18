@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@commercebill/database';
 import { resolveAuthConfig, type AuthConfig, type PartialAuthConfig } from './config.js';
 import { PasswordHasher } from './password.js';
+import { diffIds, rolesOutsideCeiling, withinCeiling } from './privileges.js';
 import { checkPassword, type PasswordProblem } from './password-policy.js';
 import {
   fingerprint,
@@ -39,7 +40,17 @@ export type AuthErrorCode =
   | 'duplicate_username'
   | 'unknown_role'
   | 'unknown_organization'
-  | 'unknown_user';
+  | 'unknown_user'
+  | 'current_password_incorrect'
+  | 'password_reuse'
+  | 'cannot_disable_self'
+  | 'cannot_reset_self'
+  | 'cannot_change_own_roles'
+  | 'role_exceeds_caller_privileges'
+  | 'target_exceeds_caller_privileges'
+  | 'last_administrator'
+  | 'actor_inactive'
+  | 'actor_forbidden';
 
 export class AuthServiceError extends Error {
   constructor(
@@ -81,6 +92,34 @@ export type LoginResult =
       mustChangePassword: boolean;
     }
   | { ok: false };
+
+/** What administrators see of a user. Never contains the password hash, sessions or tokens. */
+export interface UserView {
+  id: string;
+  organizationId: string;
+  username: string;
+  displayName: string;
+  email: string | null;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+  roles: { id: string; name: string }[];
+}
+
+export interface RoleView {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+}
+
+/** The authenticated administrator performing an operation. organizationId comes from the SESSION, never the request. */
+export interface AdminContext {
+  userId: string;
+  organizationId: string;
+  correlationId?: string | null;
+}
 
 type FailureReason = 'unknown_user' | 'disabled' | 'locked' | 'bad_password';
 
@@ -174,10 +213,14 @@ export async function createAuthService(options: AuthServiceOptions) {
     return orgs.length === 1 ? orgs[0]!.id : null;
   }
 
-  async function getPermissions(userId: string, organizationId: string): Promise<Set<string>> {
+  async function getPermissions(
+    userId: string,
+    organizationId: string,
+    db: Prisma.TransactionClient | PrismaClient = prisma,
+  ): Promise<Set<string>> {
     // Permissions come only from the user's roles in the user's own organization. There is no
     // administrator bypass: the Administrator role simply holds every catalogue permission.
-    const rows = await prisma.rolePermission.findMany({
+    const rows = await db.rolePermission.findMany({
       where: { role: { organizationId, users: { some: { userId } } } },
       select: { permission: { select: { key: true } } },
     });
@@ -216,7 +259,7 @@ export async function createAuthService(options: AuthServiceOptions) {
    */
   async function insertUser(
     tx: Prisma.TransactionClient,
-    input: Omit<CreateUserInput, 'password'>,
+    input: Omit<CreateUserInput, 'password' | 'username'> & { username?: string },
     prepared: { username: string; passwordHash: string },
     actor: Actor = {},
   ): Promise<LoginUser> {
@@ -516,6 +559,514 @@ export async function createAuthService(options: AuthServiceOptions) {
     });
   }
 
+  // ---------------------------------------------------------------------------------------------------------
+  // Task 1.6: password change / reset and administrator-driven user and role management (ADR-0017).
+  // Every operation is organization-scoped by the caller's session, re-validates the acting user's active state and
+  // required permissions INSIDE its transaction, and writes its audit event in the same transaction.
+
+  const userInclude = {
+    roles: { include: { role: { select: { id: true, name: true } } } },
+  } as const;
+  type UserWithRoles = Prisma.UserGetPayload<{ include: typeof userInclude }>;
+
+  const toUserView = (u: UserWithRoles): UserView => ({
+    id: u.id,
+    organizationId: u.organizationId,
+    username: u.username,
+    displayName: u.displayName,
+    email: u.email,
+    isActive: u.isActive,
+    mustChangePassword: u.mustChangePassword,
+    lastLoginAt: u.lastLoginAt,
+    createdAt: u.createdAt,
+    roles: u.roles.map((r) => r.role).sort((a, b) => a.name.localeCompare(b.name)),
+  });
+
+  /** Same key the database constraint trigger takes at commit: checks for one organization queue up. */
+  async function lockOrganizationAdmins(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'secadmin:' + organizationId}, 0))`;
+  }
+
+  /** The acting user must still be active and still hold the permissions the route required. */
+  async function requireActor(
+    tx: Prisma.TransactionClient,
+    ctx: AdminContext,
+    required: string[],
+  ): Promise<Set<string>> {
+    const actor = await tx.user.findFirst({
+      where: { id: ctx.userId, organizationId: ctx.organizationId, isActive: true },
+    });
+    if (!actor)
+      throw new AuthServiceError('actor_inactive', 'The acting user is no longer active.');
+    const permissions = await getPermissions(actor.id, ctx.organizationId, tx);
+    for (const key of required) {
+      if (!permissions.has(key)) {
+        throw new AuthServiceError(
+          'actor_forbidden',
+          'The acting user lacks a required permission.',
+        );
+      }
+    }
+    return permissions;
+  }
+
+  /** In-transaction twin of the database trigger, so callers get a precise error instead of a failed commit. */
+  async function assertSecurityAdminRemains(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<void> {
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+      select: { setupCompletedAt: true },
+    });
+    if (!org?.setupCompletedAt) return; // same exemption as the trigger
+    const [row] = await tx.$queryRaw<
+      { n: number }[]
+    >`SELECT organization_security_admin_count(${organizationId}::uuid) AS n`;
+    if (!row || row.n < 1) {
+      throw new AuthServiceError(
+        'last_administrator',
+        'The organization must keep at least one active user who can manage users and roles.',
+      );
+    }
+  }
+
+  async function rolesWithPermissions(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    roleIds: string[],
+  ) {
+    const roles = await tx.role.findMany({
+      where: { id: { in: roleIds }, organizationId },
+      include: { permissions: { include: { permission: { select: { key: true } } } } },
+    });
+    return roles.map((r) => ({
+      id: r.id,
+      name: r.name,
+      permissionKeys: r.permissions.map((p) => p.permission.key),
+    }));
+  }
+
+  async function listRoles(organizationId: string): Promise<RoleView[]> {
+    const rows = await prisma.role.findMany({
+      where: { organizationId },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      isSystem: r.isSystem,
+    }));
+  }
+
+  async function listUsers(
+    organizationId: string,
+    options: { limit: number; offset: number; isActive?: boolean },
+  ): Promise<{ users: UserView[]; total: number }> {
+    const where = {
+      organizationId,
+      ...(options.isActive === undefined ? {} : { isActive: options.isActive }),
+    };
+    const [rows, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        include: userInclude,
+        orderBy: { username: 'asc' },
+        take: options.limit,
+        skip: options.offset,
+      }),
+      prisma.user.count({ where }),
+    ]);
+    return { users: rows.map(toUserView), total };
+  }
+
+  async function getUser(organizationId: string, userId: string): Promise<UserView | null> {
+    const row = await prisma.user.findFirst({
+      where: { id: userId, organizationId },
+      include: userInclude,
+    });
+    return row ? toUserView(row) : null;
+  }
+
+  async function adminCreateUser(
+    ctx: AdminContext,
+    input: {
+      username: string;
+      displayName: string;
+      email?: string | null;
+      password: string;
+      roleIds?: string[];
+    },
+  ): Promise<UserView> {
+    const roleIds = [...new Set(input.roleIds ?? [])];
+    const prepared = await prepareNewUser({ username: input.username, password: input.password });
+    return prisma.$transaction(async (tx) => {
+      // Creating a user with roles is role assignment: it needs BOTH permissions.
+      const required =
+        roleIds.length > 0
+          ? ['security.user.manage', 'security.role.manage']
+          : ['security.user.manage'];
+      const actorPermissions = await requireActor(tx, ctx, required);
+      const roles = await rolesWithPermissions(tx, ctx.organizationId, roleIds);
+      if (roles.length !== roleIds.length) {
+        throw new AuthServiceError('unknown_role', 'One or more roles do not exist.');
+      }
+      if (rolesOutsideCeiling(actorPermissions, roles).length > 0) {
+        throw new AuthServiceError(
+          'role_exceeds_caller_privileges',
+          "A role exceeds the caller's own permissions.",
+        );
+      }
+      const created = await insertUser(
+        tx,
+        {
+          organizationId: ctx.organizationId,
+          displayName: input.displayName,
+          email: input.email ?? null,
+          roleNames: roles.map((r) => r.name),
+          mustChangePassword: true, // the administrator chose this password: the user must replace it
+        },
+        prepared,
+        { userId: ctx.userId, correlationId: ctx.correlationId },
+      );
+      return toUserView(
+        await tx.user.findUniqueOrThrow({ where: { id: created.id }, include: userInclude }),
+      );
+    });
+  }
+
+  async function adminSetUserRoles(
+    ctx: AdminContext,
+    targetUserId: string,
+    requestedRoleIds: string[],
+  ): Promise<UserView> {
+    const roleIds = [...new Set(requestedRoleIds)];
+    return prisma.$transaction(async (tx) => {
+      await lockOrganizationAdmins(tx, ctx.organizationId);
+      const actorPermissions = await requireActor(tx, ctx, ['security.role.manage']);
+      const target = await tx.user.findFirst({
+        where: { id: targetUserId, organizationId: ctx.organizationId },
+        include: userInclude,
+      });
+      if (!target) throw new AuthServiceError('unknown_user', 'User not found.');
+      if (target.id === ctx.userId) {
+        throw new AuthServiceError('cannot_change_own_roles', 'You cannot change your own roles.');
+      }
+      const requested = await rolesWithPermissions(tx, ctx.organizationId, roleIds);
+      if (requested.length !== roleIds.length) {
+        throw new AuthServiceError('unknown_role', 'One or more roles do not exist.');
+      }
+      const currentIds = target.roles.map((r) => r.role.id);
+      const { added, removed } = diffIds(currentIds, roleIds);
+      // The ceiling applies to every role being granted OR revoked: roles above the caller can be neither.
+      const touched = await rolesWithPermissions(tx, ctx.organizationId, [...added, ...removed]);
+      if (rolesOutsideCeiling(actorPermissions, touched).length > 0) {
+        throw new AuthServiceError(
+          'role_exceeds_caller_privileges',
+          "A role exceeds the caller's own permissions.",
+        );
+      }
+      if (added.length === 0 && removed.length === 0) return toUserView(target);
+
+      if (removed.length > 0) {
+        await tx.userRole.deleteMany({ where: { userId: target.id, roleId: { in: removed } } });
+      }
+      if (added.length > 0) {
+        await tx.userRole.createMany({
+          data: added.map((roleId) => ({ userId: target.id, roleId })),
+        });
+      }
+      await tx.user.update({ where: { id: target.id }, data: { version: { increment: 1 } } });
+      await assertSecurityAdminRemains(tx, ctx.organizationId);
+      const after = await tx.user.findUniqueOrThrow({
+        where: { id: target.id },
+        include: userInclude,
+      });
+      await audit(tx, {
+        action: 'user.roles.changed',
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        entityId: target.id,
+        after: {
+          before: target.roles.map((r) => r.role.name).sort(),
+          after: after.roles.map((r) => r.role.name).sort(),
+        },
+        correlationId: ctx.correlationId,
+      });
+      return toUserView(after);
+    });
+  }
+
+  async function adminDisableUser(
+    ctx: AdminContext,
+    targetUserId: string,
+  ): Promise<{ changed: boolean; user: UserView }> {
+    return prisma.$transaction(async (tx) => {
+      await lockOrganizationAdmins(tx, ctx.organizationId);
+      await requireActor(tx, ctx, ['security.user.manage']);
+      const target = await tx.user.findFirst({
+        where: { id: targetUserId, organizationId: ctx.organizationId },
+      });
+      if (!target) throw new AuthServiceError('unknown_user', 'User not found.');
+      if (target.id === ctx.userId) {
+        throw new AuthServiceError('cannot_disable_self', 'You cannot disable your own account.');
+      }
+      if (!target.isActive) {
+        return {
+          changed: false,
+          user: toUserView(
+            await tx.user.findUniqueOrThrow({ where: { id: target.id }, include: userInclude }),
+          ),
+        };
+      }
+      await tx.user.update({
+        where: { id: target.id },
+        data: { isActive: false, version: { increment: 1 } },
+      });
+      const revoked = await tx.session.updateMany({
+        where: { userId: target.id, revokedAt: null },
+        data: { revokedAt: clock() },
+      });
+      await assertSecurityAdminRemains(tx, ctx.organizationId);
+      await audit(tx, {
+        action: 'user.disable',
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        entityId: target.id,
+        after: { sessionsRevoked: revoked.count },
+        correlationId: ctx.correlationId,
+      });
+      return {
+        changed: true,
+        user: toUserView(
+          await tx.user.findUniqueOrThrow({ where: { id: target.id }, include: userInclude }),
+        ),
+      };
+    });
+  }
+
+  async function adminEnableUser(
+    ctx: AdminContext,
+    targetUserId: string,
+  ): Promise<{ changed: boolean; user: UserView }> {
+    return prisma.$transaction(async (tx) => {
+      await lockOrganizationAdmins(tx, ctx.organizationId);
+      await requireActor(tx, ctx, ['security.user.manage']);
+      const target = await tx.user.findFirst({
+        where: { id: targetUserId, organizationId: ctx.organizationId },
+      });
+      if (!target) throw new AuthServiceError('unknown_user', 'User not found.');
+      if (target.isActive) {
+        return {
+          changed: false,
+          user: toUserView(
+            await tx.user.findUniqueOrThrow({ where: { id: target.id }, include: userInclude }),
+          ),
+        };
+      }
+      await tx.user.update({
+        where: { id: target.id },
+        data: { isActive: true, failedLoginCount: 0, lockedUntil: null, version: { increment: 1 } },
+      });
+      await audit(tx, {
+        action: 'user.enable',
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        entityId: target.id,
+        correlationId: ctx.correlationId,
+      });
+      return {
+        changed: true,
+        user: toUserView(
+          await tx.user.findUniqueOrThrow({ where: { id: target.id }, include: userInclude }),
+        ),
+      };
+    });
+  }
+
+  /**
+   * Administrator-assisted reset: the administrator SUPPLIES a temporary password (the server never generates or
+   * returns one, and no existing password can be read). The user must change it at next login; all of their
+   * sessions are revoked and any lockout is cleared. Distinct from changeOwnPassword.
+   */
+  async function adminResetPassword(
+    ctx: AdminContext,
+    targetUserId: string,
+    temporaryPassword: string,
+  ): Promise<{ sessionsRevoked: number }> {
+    if (targetUserId === ctx.userId) {
+      throw new AuthServiceError(
+        'cannot_reset_self',
+        'Use the password change to change your own password.',
+      );
+    }
+    const preview = await prisma.user.findFirst({
+      where: { id: targetUserId, organizationId: ctx.organizationId },
+    });
+    if (!preview) throw new AuthServiceError('unknown_user', 'User not found.');
+    const prepared = await prepareNewUser({
+      username: preview.username,
+      password: temporaryPassword,
+    });
+    return prisma.$transaction(async (tx) => {
+      const actorPermissions = await requireActor(tx, ctx, ['security.user.reset_password']);
+      const target = await tx.user.findFirst({
+        where: { id: targetUserId, organizationId: ctx.organizationId },
+      });
+      if (!target) throw new AuthServiceError('unknown_user', 'User not found.');
+      // Resetting someone's password is taking over their account: only for users who cannot do more than the caller.
+      const targetPermissions = await getPermissions(target.id, ctx.organizationId, tx);
+      if (!withinCeiling(actorPermissions, targetPermissions)) {
+        throw new AuthServiceError(
+          'target_exceeds_caller_privileges',
+          'The user has permissions beyond your own.',
+        );
+      }
+      await tx.user.update({
+        where: { id: target.id },
+        data: {
+          passwordHash: prepared.passwordHash,
+          mustChangePassword: true,
+          failedLoginCount: 0,
+          lockedUntil: null,
+          version: { increment: 1 },
+        },
+      });
+      const revoked = await tx.session.updateMany({
+        where: { userId: target.id, revokedAt: null },
+        data: { revokedAt: clock() },
+      });
+      await audit(tx, {
+        action: 'user.password.reset',
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        entityId: target.id,
+        after: { sessionsRevoked: revoked.count },
+        correlationId: ctx.correlationId,
+      });
+      return { sessionsRevoked: revoked.count };
+    });
+  }
+
+  /** Counts a wrong current password toward the account lockout, so a stolen session cannot guess it for free. */
+  async function recordWrongCurrentPassword(
+    userId: string,
+    correlationId?: string | null,
+  ): Promise<void> {
+    const now = clock();
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId}::uuid FOR UPDATE`;
+      const u = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      const alreadyLocked = Boolean(u.lockedUntil && u.lockedUntil > now);
+      let count = u.failedLoginCount;
+      let locked = alreadyLocked;
+      if (!alreadyLocked) {
+        const previous = u.lockedUntil && u.lockedUntil <= now ? 0 : u.failedLoginCount;
+        count = previous + 1;
+        locked = count >= config.lockout.maxFailures;
+        await tx.user.update({
+          where: { id: u.id },
+          data: {
+            failedLoginCount: count,
+            lockedUntil: locked
+              ? new Date(now.getTime() + config.lockout.lockMinutes * 60_000)
+              : null,
+          },
+        });
+      }
+      await audit(tx, {
+        action: 'user.password.change_failed',
+        organizationId: u.organizationId,
+        userId: u.id,
+        entityId: u.id,
+        after: { reason: 'current_password_incorrect', failedCount: count, locked },
+        correlationId,
+      });
+    });
+  }
+
+  /**
+   * Self-service password change. Requires the current password, applies the password policy, rejects re-use of
+   * the current password, keeps ONLY the current session and revokes all others, and clears the forced-change flag.
+   */
+  async function changeOwnPassword(
+    auth: AuthContext,
+    input: { currentPassword: string; newPassword: string },
+    correlationId?: string | null,
+  ): Promise<{ sessionsRevoked: number }> {
+    const user = await prisma.user.findFirst({
+      where: { id: auth.userId, organizationId: auth.organizationId, isActive: true },
+    });
+    if (!user) throw new AuthServiceError('actor_inactive', 'The acting user is no longer active.');
+
+    const now = clock();
+    const tooLong = input.currentPassword.length > MAX_PASSWORD_INPUT;
+    const verified = await hasher.verify(user.passwordHash, tooLong ? '' : input.currentPassword);
+    const locked = Boolean(user.lockedUntil && user.lockedUntil > now);
+    if (!verified || tooLong || locked) {
+      if (!locked) await recordWrongCurrentPassword(user.id, correlationId);
+      throw new AuthServiceError(
+        'current_password_incorrect',
+        'The current password is not correct.',
+      );
+    }
+
+    const check = checkPassword(input.newPassword, { username: user.username }, config.password);
+    if (!check.ok) {
+      throw new AuthServiceError(
+        'weak_password',
+        'The new password does not meet the policy.',
+        check.problems,
+      );
+    }
+    if (await hasher.verify(user.passwordHash, input.newPassword)) {
+      throw new AuthServiceError(
+        'password_reuse',
+        'The new password must differ from the current one.',
+      );
+    }
+    const newHash = await hasher.hash(input.newPassword);
+
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id}::uuid FOR UPDATE`;
+      const fresh = await tx.user.findUniqueOrThrow({ where: { id: user.id } });
+      if (!fresh.isActive || fresh.passwordHash !== user.passwordHash) {
+        // Changed by someone else while we were hashing: treat as a failed attempt rather than overwrite.
+        throw new AuthServiceError(
+          'current_password_incorrect',
+          'The current password is not correct.',
+        );
+      }
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: newHash,
+          mustChangePassword: false,
+          failedLoginCount: 0,
+          lockedUntil: null,
+          version: { increment: 1 },
+        },
+      });
+      const revoked = await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null, id: { not: auth.sessionId } },
+        data: { revokedAt: clock() },
+      });
+      await audit(tx, {
+        action: 'user.password.changed',
+        organizationId: user.organizationId,
+        userId: user.id,
+        entityId: user.id,
+        after: { sessionsRevoked: revoked.count },
+        correlationId,
+      });
+      return { sessionsRevoked: revoked.count };
+    });
+  }
+
   return {
     config,
     createUser,
@@ -528,6 +1079,15 @@ export async function createAuthService(options: AuthServiceOptions) {
     disableUser,
     enableUser,
     getPermissions,
+    listRoles,
+    listUsers,
+    getUser,
+    adminCreateUser,
+    adminSetUserRoles,
+    adminDisableUser,
+    adminEnableUser,
+    adminResetPassword,
+    changeOwnPassword,
   };
 }
 

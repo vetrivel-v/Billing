@@ -1,6 +1,11 @@
 import type { AuthContext, AuthService } from '@commercebill/auth';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { forbidden, serviceUnavailable, unauthenticated } from './errors.js';
+import {
+  forbidden,
+  passwordChangeRequired,
+  serviceUnavailable,
+  unauthenticated,
+} from './errors.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -12,6 +17,13 @@ declare module 'fastify' {
     auth?: AuthContext;
   }
 }
+
+/** Routes usable while a password change is pending (ADR-0017). Everything else answers 403 AUTH_0004. */
+const PENDING_CHANGE_ALLOWED: ReadonlySet<string> = new Set([
+  '/auth/me',
+  '/auth/change-password',
+  '/auth/logout',
+]);
 
 const BEARER = /^Bearer ([A-Za-z0-9_-]{43})$/i;
 
@@ -35,6 +47,10 @@ export async function requireAuthenticatedUser(
   const context = await service.authenticateToken(bearerToken(req));
   if (!context) throw unauthenticated();
   req.auth = context;
+  // A user still on an administrator-supplied temporary password may do nothing but change it (or look/leave).
+  if (context.mustChangePassword && !PENDING_CHANGE_ALLOWED.has(req.routeOptions.url ?? '')) {
+    throw passwordChangeRequired();
+  }
 }
 
 /**

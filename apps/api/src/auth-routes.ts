@@ -2,12 +2,18 @@ import { ErrorCodes, type LoginResponse, type MeResponse } from '@commercebill/s
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuthenticatedUser } from './auth-guard.js';
+import { AuthServiceError } from '@commercebill/auth';
 import { ApiHttpError, serviceUnavailable } from './errors.js';
 
 const loginBody = z.object({
   username: z.string().min(1).max(128),
   password: z.string().min(1).max(256),
   organizationId: z.uuid().optional(),
+});
+
+const changePasswordBody = z.strictObject({
+  currentPassword: z.string().min(1).max(1024),
+  newPassword: z.string().min(1).max(1024),
 });
 
 export interface LoginRateLimit {
@@ -24,7 +30,7 @@ const LOGIN_FAILED = 'Sign-in failed. Check your username and password.';
  */
 export async function registerAuthRoutes(
   app: FastifyInstance,
-  options: { loginRateLimit: LoginRateLimit },
+  options: { loginRateLimit: LoginRateLimit; changePasswordRateLimit?: LoginRateLimit },
 ): Promise<void> {
   await app.register(async (scope) => {
     scope.addHook('onSend', async (_req, reply) => {
@@ -78,6 +84,65 @@ export async function registerAuthRoutes(
       await app.authService!.logout(req.auth!, { userId: req.auth!.userId, correlationId: req.id });
       return reply.code(204).send();
     });
+
+    scope.post(
+      '/auth/change-password',
+      {
+        preHandler: requireAuthenticatedUser,
+        config: {
+          rateLimit: {
+            max: options.changePasswordRateLimit?.max ?? 5,
+            timeWindow: options.changePasswordRateLimit?.timeWindowMs ?? 60_000,
+          },
+        },
+      },
+      async (req, reply) => {
+        const parsed = changePasswordBody.safeParse(req.body);
+        if (!parsed.success) {
+          throw new ApiHttpError(
+            400,
+            ErrorCodes.VALIDATION_FAILED,
+            'Enter your current and new password.',
+          );
+        }
+        try {
+          await app.authService!.changeOwnPassword(req.auth!, parsed.data, req.id);
+        } catch (err) {
+          if (err instanceof AuthServiceError) {
+            const bad = (field: string, rules: string[], message: string): never => {
+              throw new ApiHttpError(
+                400,
+                ErrorCodes.VALIDATION_FAILED,
+                message,
+                rules.map((rule) => ({ field, rule })),
+              );
+            };
+            if (err.code === 'current_password_incorrect')
+              bad(
+                'currentPassword',
+                ['current_password_incorrect'],
+                'The current password is not correct.',
+              );
+            if (err.code === 'password_reuse')
+              bad(
+                'newPassword',
+                ['same_as_current'],
+                'The new password must differ from the current one.',
+              );
+            if (err.code === 'weak_password')
+              bad('newPassword', err.problems, 'The new password does not meet the policy.');
+            if (err.code === 'actor_inactive')
+              throw new ApiHttpError(
+                401,
+                ErrorCodes.UNAUTHENTICATED,
+                'Authentication is required.',
+              );
+          }
+          throw err;
+        }
+        return reply.code(204).send();
+      },
+    );
 
     scope.get(
       '/auth/me',

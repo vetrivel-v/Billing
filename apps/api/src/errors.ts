@@ -24,6 +24,14 @@ export const unauthenticated = () =>
 export const forbidden = () =>
   new ApiHttpError(403, ErrorCodes.FORBIDDEN, 'You do not have permission to perform this action.');
 
+/** 403 AUTH_0004: a temporary password is still in use; only change-password, me and logout are allowed. */
+export const passwordChangeRequired = () =>
+  new ApiHttpError(
+    403,
+    ErrorCodes.PASSWORD_CHANGE_REQUIRED,
+    'You must change your password before continuing.',
+  );
+
 export const serviceUnavailable = () =>
   new ApiHttpError(
     503,

@@ -13,6 +13,7 @@ export {
   isValidUsername,
   normalizeUsername,
   type Actor,
+  type AdminContext,
   type AuthContext,
   type AuthErrorCode,
   type AuthService,
@@ -21,4 +22,7 @@ export {
   type HasherLike,
   type LoginResult,
   type LoginUser,
+  type RoleView,
+  type UserView,
 } from './service.js';
+export { diffIds, rolesOutsideCeiling, withinCeiling, type RolePermissions } from './privileges.js';

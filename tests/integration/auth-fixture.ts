@@ -69,6 +69,8 @@ export async function createFixture(
         launchSecret: LAUNCH_SECRET,
         globalRateLimit: { max: 1_000_000, timeWindowMs: 60_000 },
         loginRateLimit: { max: 100_000, timeWindowMs: 60_000 },
+        changePasswordRateLimit: { max: 100_000, timeWindowMs: 60_000 },
+        resetPasswordRateLimit: { max: 100_000, timeWindowMs: 60_000 },
         // Setup limits are high by default so ordinary tests are not throttled; rate-limit tests override them.
         setup: {
           completeRateLimit: { max: 100_000, timeWindowMs: 60_000 },

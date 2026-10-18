@@ -135,6 +135,17 @@ cleared or changed). Existing violating rows make the migration abort atomically
   (organization, type, document_ref). A trigger rejects a row that does not match its sequence or exceeds its counter;
   UPDATE, DELETE and TRUNCATE are blocked.
 
+### 3.5 Changes in migration `20261021000000_task_1_6_security_admin_invariant` (Task 1.6)
+
+- No table or column changes (`schema.prisma` unchanged). Adds `organization_security_admin_count(org)` (active users
+  holding BOTH `security.user.manage` and `security.role.manage` through roles of that organization) and the trigger
+  function `enforce_security_administrator()`.
+- Deferred CONSTRAINT TRIGGERs `users_keep_security_admin`, `user_roles_keep_security_admin`,
+  `role_permissions_keep_security_admin`, `roles_keep_security_admin`, `permissions_keep_security_admin` fail the
+  commit when an organization with a completed setup would be left with zero such users. The function takes
+  `pg_advisory_xact_lock(hashtextextended('secadmin:' || org, 0))`, so concurrent transactions are checked one after
+  another on fresh snapshots. Organizations with `setup_completed_at IS NULL` are exempt (R-060).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.
