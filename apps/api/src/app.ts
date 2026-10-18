@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { createAuthService, type HasherLike, type PartialAuthConfig } from '@commercebill/auth';
 import { pingDatabase, type PrismaClient } from '@commercebill/database';
+import { createSetupService, type SetupHooks } from '@commercebill/setup';
 import {
   APP_VERSION,
   ErrorCodes,
@@ -14,6 +15,7 @@ import {
 } from '@commercebill/shared-types';
 import type { AppEnv } from '@commercebill/validation';
 import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
+import { registerSetupRoutes } from './setup-routes.js';
 import { ApiHttpError } from './errors.js';
 import { LAUNCH_SECRET_HEADER, isExemptPath, launchSecretMatches } from './launch-secret.js';
 
@@ -37,6 +39,13 @@ export interface AppDeps {
   globalRateLimit?: LoginRateLimit;
   /** Per-route limit for POST /auth/login. Default 10 requests per minute. */
   loginRateLimit?: LoginRateLimit;
+  /** First-run setup (ADR-0015). Rate limits default to 5/min for completion and 60/min for draft saves. */
+  setup?: {
+    completeRateLimit?: LoginRateLimit;
+    draftRateLimit?: LoginRateLimit;
+    /** Test hook: fail part-way through completion to prove rollback. */
+    hooks?: SetupHooks;
+  };
   /** Test hook: capture structured logs. */
   logStream?: { write(msg: string): void } | undefined;
 }
@@ -122,6 +131,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
           message: err.message,
           dataSaved: false,
           correlationId: req.id,
+          ...(err.problems ? { problems: err.problems } : {}),
         },
       };
       void reply.code(err.statusCode).send(known);
@@ -180,6 +190,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     app.decorate('authService', authService);
     await registerAuthRoutes(app, {
       loginRateLimit: deps.loginRateLimit ?? { max: 10, timeWindowMs: 60_000 },
+    });
+    const setupService = createSetupService({
+      prisma: deps.prisma,
+      auth: authService,
+      appVersion: APP_VERSION,
+      ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      ...(deps.setup?.hooks ? { hooks: deps.setup.hooks } : {}),
+    });
+    await registerSetupRoutes(app, setupService, {
+      complete: deps.setup?.completeRateLimit ?? { max: 5, timeWindowMs: 60_000 },
+      draft: deps.setup?.draftRateLimit ?? { max: 60, timeWindowMs: 60_000 },
     });
   }
 

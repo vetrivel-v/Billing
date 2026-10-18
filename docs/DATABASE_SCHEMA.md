@@ -116,6 +116,14 @@ aborts atomically on a collision), `sessions_token_hash_form_chk` (token_hash mu
 token cannot be stored), `sessions_expiry_chk` (expires_at > created_at), and trigger `users_no_delete`
 (users are disabled, never deleted).
 
+### 3.3 Changes in migration `20261019000000_task_1_4_setup_invariants` (Task 1.4)
+
+No table or column changes (`schema.prisma` unchanged). On `organizations`: format checks for PAN, GSTIN and state
+code; the GST-status rules (registered requires a GSTIN, unregistered forbids one); GSTIN-state and GSTIN-PAN
+consistency; and trigger `organizations_setup_completed_immutable` (once `setup_completed_at` is set it can never be
+cleared or changed). Existing violating rows make the migration abort atomically. The setup draft lives in
+`application_settings` (key `setup.draft`, global row).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

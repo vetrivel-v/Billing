@@ -11,3 +11,7 @@ packages/database/src/generated/
 *.tsbuildinfo
 release/
 .vite/
+
+# First-run setup drafts are stored in the database, never on disk; guard against stray exports
+setup-draft*.json
+*.setup-draft.json

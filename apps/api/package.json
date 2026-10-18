@@ -12,6 +12,7 @@
   "dependencies": {
     "@commercebill/auth": "^0.0.1",
     "@commercebill/database": "^0.0.1",
+    "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",
     "@commercebill/validation": "^0.0.1",
     "@fastify/cors": "^11.3.1",

@@ -35,6 +35,8 @@ export interface ApiErrorBody {
     dataSaved: boolean;
     /** Correlation/reference ID that also appears in server logs. */
     correlationId: string;
+    /** Optional field-level problems (field path + rule code only; never submitted values). */
+    problems?: { field: string; rule: string }[];
   };
 }
 
@@ -83,4 +85,17 @@ export interface MeResponse {
   mustChangePassword: boolean;
   sessionExpiresAt: string;
   idleTimeoutSeconds: number;
+}
+
+/** GET /setup/status. Deliberately minimal: no business, administrator or financial information. */
+export interface SetupStatusResponse {
+  setupRequired: boolean;
+  draftAvailable: boolean;
+}
+
+/** POST /setup/complete success body. No session token: the administrator must sign in explicitly. */
+export interface SetupCompleteResponse {
+  organizationId: string;
+  administratorUsername: string;
+  nextStep: 'login';
 }

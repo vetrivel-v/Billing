@@ -45,6 +45,7 @@ reviewed in the diff.
 - [x] Electron navigation / external URL policy
 - [x] Authentication, authorization and privilege-escalation tests (Task 1.3: forged/altered tokens, cross-user, cross-organization, role revocation, no admin bypass)
 - [x] Rate limiting and per-account lockout on login (Task 1.3; limiter is coarse on loopback, R-046)
+- [x] Bootstrap routes: launch secret, database-authoritative precondition under advisory lock, rate limits, no session, no secret in draft/logs/audit, value-free validation errors (Task 1.4). They are the ONLY routes exempt from user authentication; every future business route must use requireAuthenticatedUser + requirePermission
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)
 - [x] IPC sender-URL validation and app:// path-traversal protection (Task 1.2)

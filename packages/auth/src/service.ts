@@ -26,6 +26,11 @@ export interface AuthServiceOptions {
 export interface Actor {
   userId?: string | null;
   correlationId?: string | null;
+  /**
+   * Identity of a non-user actor, e.g. "system:bootstrap" during first-run setup, when no authenticated user
+   * exists. Recorded in the audit event as `actor`, so system activity is never mistaken for a user's.
+   */
+  system?: string | null;
 }
 
 export type AuthErrorCode =
@@ -127,8 +132,9 @@ export async function createAuthService(options: AuthServiceOptions) {
       organizationId?: string | null;
       userId?: string | null;
       entityId?: string | null;
-      after?: Prisma.InputJsonValue;
+      after?: Prisma.InputJsonObject;
       correlationId?: string | null;
+      system?: string | null;
     },
   ): Promise<void> {
     // Never pass password, hash or token material here; callers supply only non-secret facts.
@@ -140,7 +146,10 @@ export async function createAuthService(options: AuthServiceOptions) {
         action: entry.action,
         entityType: 'user',
         entityId: entry.entityId ?? null,
-        afterValues: entry.after ?? undefined,
+        afterValues:
+          entry.after || entry.system
+            ? { ...(entry.after ?? {}), ...(entry.system ? { actor: entry.system } : {}) }
+            : undefined,
         appVersion,
         correlationId: entry.correlationId ?? null,
         occurredAt: clock(),
@@ -175,7 +184,14 @@ export async function createAuthService(options: AuthServiceOptions) {
     return new Set(rows.map((r) => r.permission.key));
   }
 
-  async function createUser(input: CreateUserInput, actor: Actor = {}): Promise<LoginUser> {
+  /**
+   * Validates the username and password policy and hashes the password. Runs OUTSIDE any database
+   * transaction (Argon2 takes ~110 ms) so callers never hold locks while hashing.
+   */
+  async function prepareNewUser(input: {
+    username: string;
+    password: string;
+  }): Promise<{ username: string; passwordHash: string }> {
     const username = normalizeUsername(input.username);
     if (!isValidUsername(username)) {
       throw new AuthServiceError(
@@ -191,51 +207,66 @@ export async function createAuthService(options: AuthServiceOptions) {
         check.problems,
       );
     }
-    const passwordHash = await hasher.hash(input.password);
+    return { username, passwordHash: await hasher.hash(input.password) };
+  }
 
+  /**
+   * Inserts a user on the caller's transaction client (so first-run setup can create the Administrator
+   * atomically with the organization). `prepared` must come from prepareNewUser.
+   */
+  async function insertUser(
+    tx: Prisma.TransactionClient,
+    input: Omit<CreateUserInput, 'password'>,
+    prepared: { username: string; passwordHash: string },
+    actor: Actor = {},
+  ): Promise<LoginUser> {
     try {
-      return await prisma.$transaction(async (tx) => {
-        const org = await tx.organization.findUnique({ where: { id: input.organizationId } });
-        if (!org) throw new AuthServiceError('unknown_organization', 'Organization not found.');
-        const roleNames = [...new Set(input.roleNames ?? [])];
-        const roles = await tx.role.findMany({
-          where: { organizationId: input.organizationId, name: { in: roleNames } },
-        });
-        if (roles.length !== roleNames.length) {
-          throw new AuthServiceError('unknown_role', 'One or more roles do not exist.');
-        }
-        const user = await tx.user.create({
-          data: {
-            organizationId: input.organizationId,
-            username,
-            displayName: input.displayName,
-            email: input.email ?? null,
-            passwordHash,
-            mustChangePassword: input.mustChangePassword ?? false,
-            roles: { create: roles.map((r) => ({ roleId: r.id })) },
-          },
-        });
-        await audit(tx, {
-          action: 'user.create',
-          organizationId: input.organizationId,
-          userId: actor.userId,
-          entityId: user.id,
-          after: { username, roles: roleNames },
-          correlationId: actor.correlationId,
-        });
-        return {
-          id: user.id,
-          organizationId: user.organizationId,
-          username: user.username,
-          displayName: user.displayName,
-        };
+      const org = await tx.organization.findUnique({ where: { id: input.organizationId } });
+      if (!org) throw new AuthServiceError('unknown_organization', 'Organization not found.');
+      const roleNames = [...new Set(input.roleNames ?? [])];
+      const roles = await tx.role.findMany({
+        where: { organizationId: input.organizationId, name: { in: roleNames } },
       });
+      if (roles.length !== roleNames.length) {
+        throw new AuthServiceError('unknown_role', 'One or more roles do not exist.');
+      }
+      const user = await tx.user.create({
+        data: {
+          organizationId: input.organizationId,
+          username: prepared.username,
+          displayName: input.displayName,
+          email: input.email ?? null,
+          passwordHash: prepared.passwordHash,
+          mustChangePassword: input.mustChangePassword ?? false,
+          roles: { create: roles.map((r) => ({ roleId: r.id })) },
+        },
+      });
+      await audit(tx, {
+        action: 'user.create',
+        organizationId: input.organizationId,
+        userId: actor.userId,
+        entityId: user.id,
+        after: { username: prepared.username, roles: roleNames },
+        correlationId: actor.correlationId,
+        system: actor.system,
+      });
+      return {
+        id: user.id,
+        organizationId: user.organizationId,
+        username: user.username,
+        displayName: user.displayName,
+      };
     } catch (err) {
       if ((err as { code?: string }).code === 'P2002') {
         throw new AuthServiceError('duplicate_username', 'That username is already in use.');
       }
       throw err;
     }
+  }
+
+  async function createUser(input: CreateUserInput, actor: Actor = {}): Promise<LoginUser> {
+    const prepared = await prepareNewUser(input);
+    return prisma.$transaction((tx) => insertUser(tx, input, prepared, actor));
   }
 
   async function login(input: {
@@ -488,6 +519,8 @@ export async function createAuthService(options: AuthServiceOptions) {
   return {
     config,
     createUser,
+    prepareNewUser,
+    insertUser,
     login,
     authenticateToken,
     logout,

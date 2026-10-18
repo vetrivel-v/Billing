@@ -43,11 +43,17 @@ export interface Fixture {
 }
 
 /** Fresh isolated database + organization + reference seed (permissions, roles, units, tax data). */
-export async function createFixture(adminUrl: string): Promise<Fixture> {
+export async function createFixture(
+  adminUrl: string,
+  options: { bare?: boolean } = {},
+): Promise<Fixture> {
   const db = await createIsolatedDatabase(adminUrl);
   const prisma = createPrismaClient(db.url);
-  const org = await prisma.organization.create({ data: { legalName: 'DEMO Auth Co (fictional)' } });
-  await seedReference(prisma, { organizationId: org.id });
+  // `bare` = a freshly migrated database with NO organization (fresh installation, for setup tests).
+  const org = options.bare
+    ? { id: '' }
+    : await prisma.organization.create({ data: { legalName: 'DEMO Auth Co (fictional)' } });
+  if (!options.bare) await seedReference(prisma, { organizationId: org.id });
   const clock = makeClock();
   const apps: FastifyInstance[] = [];
 
@@ -63,6 +69,11 @@ export async function createFixture(adminUrl: string): Promise<Fixture> {
         launchSecret: LAUNCH_SECRET,
         globalRateLimit: { max: 1_000_000, timeWindowMs: 60_000 },
         loginRateLimit: { max: 100_000, timeWindowMs: 60_000 },
+        // Setup limits are high by default so ordinary tests are not throttled; rate-limit tests override them.
+        setup: {
+          completeRateLimit: { max: 100_000, timeWindowMs: 60_000 },
+          draftRateLimit: { max: 100_000, timeWindowMs: 60_000 },
+        },
         auth: {
           allowWeakHashingForTests: true,
           config: { argon2: FAST_ARGON2 },
@@ -87,7 +98,18 @@ export interface ApiJson {
   idleTimeoutSeconds: number;
   user: { id: string; username: string; organizationId: string };
   permissions: string[];
-  error: { code: string; message: string; dataSaved: boolean; correlationId?: string };
+  error: {
+    code: string;
+    message: string;
+    dataSaved: boolean;
+    correlationId?: string;
+    problems?: { field: string; rule: string }[];
+  };
+  /** GET /setup/draft */
+  draft: { data: Record<string, Record<string, string>>; version: number; savedAt: string } | null;
+  discarded: boolean;
+  version: number;
+  [key: string]: unknown;
 }
 
 export interface Req {
@@ -100,7 +122,7 @@ export interface Req {
 
 export async function call(
   app: FastifyInstance,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   url: string,
   req: Req = {},
 ) {

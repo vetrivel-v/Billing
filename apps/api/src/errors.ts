@@ -9,6 +9,7 @@ export class ApiHttpError extends Error {
     readonly statusCode: number,
     readonly apiCode: ErrorCode,
     message: string,
+    readonly problems?: { field: string; rule: string }[],
   ) {
     super(message);
     this.name = 'ApiHttpError';
