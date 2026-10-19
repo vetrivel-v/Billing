@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   Alert,
   AppHeader,
+  Badge,
+  Checkbox,
+  TextArea,
   AppShell,
   Button,
   Card,
@@ -249,5 +252,59 @@ describe('Steps', () => {
     expect(items[1]!.textContent).toContain('(current step)');
     expect(items[2]!.getAttribute('aria-current')).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Setup progress' })).toBeTruthy();
+  });
+});
+
+describe('TextArea, Checkbox and Badge', () => {
+  it('TextArea has a linked label, hint and error like the other fields', () => {
+    render(
+      <TextArea label="Notes" requirement="optional" hint="Anything useful" error="Too long" />,
+    );
+    const box = screen.getByLabelText('Notes (optional)');
+    expect(box.tagName).toBe('TEXTAREA');
+    expect(box.getAttribute('aria-invalid')).toBe('true');
+    expect(box.getAttribute('aria-describedby')).toContain('-error');
+    expect(screen.getByText('Anything useful')).toBeTruthy();
+  });
+
+  it('Checkbox is a labelled native checkbox that reports changes', () => {
+    const onChange = vi.fn();
+    render(
+      <Checkbox
+        label="Same as billing"
+        description="Use the billing address"
+        onChange={onChange}
+      />,
+    );
+    const box = screen.getByLabelText(/Same as billing/) as HTMLInputElement;
+    expect(box.type).toBe('checkbox');
+    fireEvent.click(box);
+    expect(onChange).toHaveBeenCalled();
+    expect(screen.getByText('Use the billing address')).toBeTruthy();
+  });
+
+  it('Badge renders its text for every tone and RadioGroup can lay options in a row', () => {
+    render(
+      <>
+        <Badge>neutral</Badge>
+        <Badge tone="success">success</Badge>
+        <Badge tone="warning">warning</Badge>
+        <Badge tone="brand">brand</Badge>
+        <RadioGroup
+          legend="Type"
+          name="t"
+          layout="row"
+          value="a"
+          onChange={() => undefined}
+          options={[
+            { value: 'a', label: 'A' },
+            { value: 'b', label: 'B' },
+          ]}
+        />
+      </>,
+    );
+    for (const t of ['neutral', 'success', 'warning', 'brand'])
+      expect(screen.getByText(t)).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Type' }).querySelector('.grid')).toBeTruthy();
   });
 });

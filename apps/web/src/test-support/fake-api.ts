@@ -5,6 +5,8 @@ import { vi } from 'vitest';
 export interface FakeRequest {
   method: string;
   path: string;
+  /** The query string, e.g. "?search=ab&limit=25" (empty when none). */
+  query: string;
   headers: Record<string, string>;
   body: unknown;
 }
@@ -54,6 +56,7 @@ export function installFakeApi(handlers: Record<string, FakeHandler>) {
     const req: FakeRequest = {
       method: init?.method ?? 'GET',
       path: u.pathname,
+      query: u.search,
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
     };

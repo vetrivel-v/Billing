@@ -5,6 +5,8 @@ import type {
   HealthResponse,
   LoginResponse,
   MeResponse,
+  CustomerListResponse,
+  CustomerView,
   SetupCompleteResponse,
   SetupStatusResponse,
 } from '@commercebill/shared-types';
@@ -104,7 +106,7 @@ interface CallOptions {
  * when the service cannot be reached.
  */
 async function callApi<T>(
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   path: string,
   opts: CallOptions = {},
 ): Promise<T> {
@@ -170,3 +172,50 @@ export const saveSetupDraft = (
 /** Atomic first-run completion. Creates NO session: the administrator signs in afterwards. */
 export const completeSetup = (body: unknown): Promise<SetupCompleteResponse> =>
   callApi('POST', '/setup/complete', { body });
+
+// --------------------------------------------------------------------------------------------- customers
+
+export interface CustomerQuery {
+  search?: string;
+  isActive?: boolean;
+  type?: 'B2C' | 'B2B';
+  limit: number;
+  offset: number;
+}
+
+/** Search terms travel in the query string of a GET to the loopback API (the server never logs query strings). */
+export function listCustomers(token: string, q: CustomerQuery): Promise<CustomerListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
+  if (q.type) params.set('type', q.type);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/customers?${params.toString()}`, { token });
+}
+
+export const getCustomer = (token: string, id: string): Promise<{ customer: CustomerView }> =>
+  callApi('GET', `/customers/${encodeURIComponent(id)}`, { token });
+
+export const createCustomer = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ customer: CustomerView }> => callApi('POST', '/customers', { token, body });
+
+export const updateCustomer = (
+  token: string,
+  id: string,
+  body: Record<string, unknown>,
+): Promise<{ customer: CustomerView }> =>
+  callApi('PATCH', `/customers/${encodeURIComponent(id)}`, { token, body });
+
+export const setCustomerActive = (
+  token: string,
+  id: string,
+  active: boolean,
+  expectedVersion: number,
+): Promise<{ customer: CustomerView }> =>
+  callApi('POST', `/customers/${encodeURIComponent(id)}/${active ? 'activate' : 'deactivate'}`, {
+    token,
+    body: { expectedVersion },
+  });

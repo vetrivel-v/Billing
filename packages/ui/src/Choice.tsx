@@ -72,6 +72,7 @@ export function RadioGroup({
   value,
   onChange,
   error,
+  layout = 'column',
 }: {
   legend: string;
   name: string;
@@ -79,35 +80,59 @@ export function RadioGroup({
   value: string;
   onChange: (value: string) => void;
   error?: string | undefined;
+  /** 'row' puts short option lists side by side to save vertical space. */
+  layout?: 'column' | 'row';
 }) {
   const id = useId();
   return (
-    <fieldset aria-describedby={error ? `${id}-error` : undefined} className="space-y-2">
+    <fieldset aria-describedby={error ? `${id}-error` : undefined} className="space-y-1">
       <legend className="text-sm font-medium text-slate-700">{legend}</legend>
-      {options.map((o) => (
-        <label
-          key={o.value}
-          className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50 has-checked:border-brand-600 has-checked:bg-brand-50"
-        >
-          <input
-            type="radio"
-            name={name}
-            value={o.value}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
-            className="mt-0.5 accent-brand-600"
-          />
-          <span>
-            <span className="block text-sm font-medium text-slate-900">{o.label}</span>
-            {o.description && <span className="block text-xs text-slate-500">{o.description}</span>}
-          </span>
-        </label>
-      ))}
+      <div className={layout === 'row' ? 'grid gap-2 sm:grid-cols-2' : 'space-y-2'}>
+        {options.map((o) => (
+          <label
+            key={o.value}
+            className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3 hover:bg-slate-50 has-checked:border-brand-600 has-checked:bg-brand-50"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={o.value}
+              checked={value === o.value}
+              onChange={() => onChange(o.value)}
+              className="mt-0.5 accent-brand-600"
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-900">{o.label}</span>
+              {o.description && (
+                <span className="block text-xs text-slate-500">{o.description}</span>
+              )}
+            </span>
+          </label>
+        ))}
+      </div>
       {error && (
         <p id={`${id}-error`} className="text-xs font-medium text-red-700">
           {error}
         </p>
       )}
     </fieldset>
+  );
+}
+
+/** A single checkbox with a visible label and optional description. */
+export function Checkbox({
+  label,
+  description,
+  ...rest
+}: Omit<ComponentPropsWithRef<'input'>, 'type' | 'id'> & { label: string; description?: string }) {
+  const id = useId();
+  return (
+    <div className="flex items-start gap-3">
+      <input id={id} type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-600" {...rest} />
+      <label htmlFor={id} className="text-sm">
+        <span className="font-medium text-slate-800">{label}</span>
+        {description && <span className="block text-xs text-slate-500">{description}</span>}
+      </label>
+    </div>
   );
 }

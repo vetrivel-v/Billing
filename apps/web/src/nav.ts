@@ -18,7 +18,7 @@ export const MODULES: readonly NavModule[] = [
     label: 'Customers',
     path: '/customers',
     permission: 'customer.read',
-    available: false,
+    available: true,
   },
   {
     key: 'products',

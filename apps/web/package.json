@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@commercebill/customers": "^0.0.1",
     "@commercebill/numbering": "^0.0.1",
     "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",

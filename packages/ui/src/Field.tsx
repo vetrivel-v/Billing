@@ -92,3 +92,37 @@ export function PasswordInput({ label, requirement, hint, error, className, ...r
     </div>
   );
 }
+
+interface TextAreaProps extends Omit<ComponentPropsWithRef<'textarea'>, 'id'> {
+  label: string;
+  requirement?: 'required' | 'optional';
+  hint?: string;
+  error?: string | undefined;
+}
+
+/** Multi-line text with the same label / hint / error wiring as TextInput. */
+export function TextArea({ label, requirement, hint, error, className, ...rest }: TextAreaProps) {
+  const id = useId();
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+        {label}
+        <Requirement value={requirement} />
+      </label>
+      <textarea
+        {...rest}
+        id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describe(id, hint, error)}
+        className={cx(
+          'min-h-20 w-full rounded-md border bg-white px-3 py-2 text-sm text-slate-900',
+          'focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-brand-600',
+          'disabled:bg-slate-100 disabled:text-slate-500',
+          error ? 'border-red-500' : 'border-slate-300',
+          className,
+        )}
+      />
+      <Messages id={id} {...(hint ? { hint } : {})} error={error} />
+    </div>
+  );
+}

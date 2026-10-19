@@ -116,7 +116,9 @@ describe('login and shell against the real API', () => {
     for (const label of ['Customers', 'Products', 'Inventory', 'Billing', 'Settings']) {
       expect(nav.textContent).toContain(label);
     }
-    expect(within(nav).getAllByText('Coming soon')).toHaveLength(5);
+    // Customers is a built module (a link); the other four are still "Coming soon".
+    expect(within(nav).getAllByText('Coming soon')).toHaveLength(4);
+    expect(within(nav).getByRole('link', { name: 'Customers' })).toBeTruthy();
     // The live service-status card is real data from /health and /health/db.
     expect(await screen.findByTestId('api-status')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('db-status').textContent).toBe('ok'));

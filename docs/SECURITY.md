@@ -53,6 +53,7 @@ reviewed in the diff.
 - [x] Session token memory-only in the renderer (never storage, URL, DOM or logs) and separate from the launch secret; sign-out revokes the session; idle/absolute expiry and 401 handling; in-flight responses cannot resurrect an ended session
 - [x] Navigation derived from permissions, never role names (the server still enforces every route)
 - [x] Setup wizard (Task 1.8): the administrator password is memory-only (never in the draft, storage, URL, logs, audit, review page or DOM outside active inputs), a rejected password is dropped, completion creates no session, a completed installation cannot reopen the wizard or bootstrap endpoints, no bank/UPI/credential fields are collected
+- [x] Customer master (Task 1.9): every route behind launch secret + session + exact customer.read / customer.write; organization from the session (other-organization ids are 404); optimistic concurrency; no DELETE route and a database trigger forbidding deletion; audit events carry no personal data; request logs carry no query strings (search terms) - found and fixed in this task; search wildcards escaped
 - [ ] Automated accessibility audit (planned, R-069)
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)

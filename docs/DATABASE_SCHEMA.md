@@ -146,6 +146,18 @@ cleared or changed). Existing violating rows make the migration abort atomically
   `pg_advisory_xact_lock(hashtextextended('secadmin:' || org, 0))`, so concurrent transactions are checked one after
   another on fresh snapshots. Organizations with `setup_completed_at IS NULL` are exempt (R-060).
 
+### 3.6 Changes in migration `20261022000000_task_1_9_customers` (Task 1.9)
+
+- New table `customers`: internal UUID id; `organization_id` (FK, restrict); `code` (unique per organization, immutable); `customer_type` (B2C | B2B);
+  names, contact person, e-mail, phones; `gst_status` (existing enum), `gstin`, `pan`; billing address (`billing_*`, state stored as the two-digit GST state code
+  only, name derived from the reference list), `country`; `shipping_same_as_billing` plus nullable `shipping_*` columns used only when delivery differs;
+  `place_of_supply_state_code` (a stored fact for the Task 1.12 tax engine); `credit_limit` numeric(14,2); `payment_terms_days`; `notes`; `is_active`;
+  timestamps; `version`. Indexes: `(organization_id, is_active)`, `(organization_id, legal_name)`. CHECKs enforce code/GSTIN/PAN/state/PIN/country formats, the GST
+  status rules (registered needs a GSTIN, unregistered forbids one, B2C is unregistered), credit-limit and payment-term ranges and shipping consistency. A partial unique
+  index allows one GSTIN per organization. Trigger `customers_protect_identity` blocks DELETE and any change of id, organization, code or creation time.
+- New table `customer_code_counters` (one row per organization, `last_number >= 0`) behind generated codes, advanced under a row lock inside the creating transaction.
+- Existing tables and rows are untouched (tested against a populated Task 1.8 database).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

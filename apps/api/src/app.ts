@@ -16,6 +16,8 @@ import {
 import type { AppEnv } from '@commercebill/validation';
 import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
 import { registerUserRoutes } from './user-routes.js';
+import { registerCustomerRoutes } from './customer-routes.js';
+import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
 import { ApiHttpError } from './errors.js';
 import { LAUNCH_SECRET_HEADER, isExemptPath, launchSecretMatches } from './launch-secret.js';
@@ -75,6 +77,19 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     logger: {
       level: deps.env.LOG_LEVEL,
       redact: { paths: LOG_REDACT_PATHS, censor: '[REDACTED]' },
+      serializers: {
+        // Query strings can carry personal data (customer search by phone, e-mail or GSTIN): log the path only.
+        req(req) {
+          const url = req.url ?? '';
+          const q = url.indexOf('?');
+          return {
+            method: req.method,
+            url: q >= 0 ? `${url.slice(0, q)}?[query redacted]` : url,
+            host: req.host,
+            remoteAddress: req.ip,
+          };
+        },
+      },
       ...(deps.logStream ? { stream: deps.logStream } : {}),
     },
     genReqId: () => randomUUID(),
@@ -203,6 +218,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         ? { resetPasswordRateLimit: deps.resetPasswordRateLimit }
         : {}),
     });
+    await registerCustomerRoutes(
+      app,
+      createCustomerService({
+        prisma: deps.prisma,
+        appVersion: APP_VERSION,
+        ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      }),
+    );
     const setupService = createSetupService({
       prisma: deps.prisma,
       auth: authService,

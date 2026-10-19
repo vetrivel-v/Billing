@@ -25,6 +25,9 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
+          // The unit suite now includes many jsdom component tests that run in parallel; a 5 s default made two API
+          // tests time out once under whole-suite load (they pass alone and on re-run). Assertions are unchanged.
+          testTimeout: 15_000,
           include: [
             'packages/**/*.test.{ts,tsx}',
             'apps/**/*.test.{ts,tsx}',

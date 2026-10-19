@@ -32,6 +32,11 @@ export interface AuthApi {
   signIn(username: string, password: string): Promise<void>;
   signOut(): Promise<void>;
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
+  /**
+   * Runs an authenticated API call with the session token (kept in memory here). A 401 ends the session. Screens
+   * never see the token itself.
+   */
+  authed<T>(call: (token: string) => Promise<T>): Promise<T>;
   /** UI convenience only: the server enforces permissions on every request. */
   can(permission: string): boolean;
 }
@@ -180,9 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       changePassword,
+      authed: run,
       can: (permission) => permissions?.includes(permission) ?? false,
     }),
-    [state, boot, setupCompleted, signIn, signOut, changePassword, permissions],
+    [state, boot, setupCompleted, signIn, signOut, changePassword, run, permissions],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

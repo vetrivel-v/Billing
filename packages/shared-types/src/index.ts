@@ -104,3 +104,55 @@ export interface SetupCompleteResponse {
   administratorUsername: string;
   nextStep: 'login';
 }
+
+// ------------------------------------------------------------------------------------------------ customers
+
+export type CustomerType = 'B2C' | 'B2B';
+export type CustomerGstStatus = 'REGISTERED' | 'UNREGISTERED' | 'COMPOSITION';
+
+/** A customer as the API returns it. State names are derived from the reference list; dates are ISO strings. */
+export interface CustomerView {
+  id: string;
+  code: string;
+  customerType: CustomerType;
+  legalName: string;
+  displayName: string | null;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  alternatePhone: string | null;
+  gstStatus: CustomerGstStatus;
+  gstin: string | null;
+  pan: string | null;
+  billingAddressLine1: string;
+  billingAddressLine2: string | null;
+  billingCity: string | null;
+  billingStateCode: string;
+  billingStateName: string | null;
+  billingPinCode: string | null;
+  country: string;
+  shippingSameAsBilling: boolean;
+  shippingAddressLine1: string | null;
+  shippingAddressLine2: string | null;
+  shippingCity: string | null;
+  shippingStateCode: string | null;
+  shippingStateName: string | null;
+  shippingPinCode: string | null;
+  placeOfSupplyStateCode: string;
+  placeOfSupplyStateName: string | null;
+  /** Decimal string with two places, or null. */
+  creditLimit: string | null;
+  paymentTermsDays: number | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface CustomerListResponse {
+  customers: CustomerView[];
+  total: number;
+  limit: number;
+  offset: number;
+}

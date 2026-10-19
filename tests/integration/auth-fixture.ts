@@ -124,7 +124,7 @@ export interface Req {
 
 export async function call(
   app: FastifyInstance,
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   url: string,
   req: Req = {},
 ) {

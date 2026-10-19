@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-19 (after Phase 1 Task 1.8). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-19 (after Phase 1 Task 1.9). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                                                                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                       |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.8 complete; Task 1.9 not started**                                                                                                                                                                                                                                                     |
-| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                                                              |
-| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                                                                  |
-| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                     |
-| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 343 unit + 295 integration tests (638) passed; coverage 96.2% statements / 91.3% branches / 98.3% functions / 97.6% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                          |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                           |
+| Item                      | Value                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                                             |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.9 complete; Task 1.10 not started**                                                                                                                                                                                                                                                                          |
+| Current database version  | `20261022000000_task_1_9_customers` (21 tables: Task 1.9 added `customers` and `customer_code_counters`)                                                                                                                                                                                                                                        |
+| Last successful migration | `20261022000000_task_1_9_customers` - applied to clean databases by every integration file and to a populated Task 1.8 database by its migration test, 2026-10-19                                                                                                                                                                               |
+| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                                           |
+| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 384 unit + 344 integration tests (728) passed; coverage 95.7% statements / 91.3% branches / 97.4% functions / 97.2% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                                                |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = `7cdc2a7`; Task 1.9 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                                                 |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -198,6 +198,43 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
 
+## Task 1.9 results (customer master vertical slice; see docs/PHASE_1_TASK_1_9_COMPLETION_REPORT.md, ADR-0020)
+
+- **Visible result:** the Customers sidebar entry is now real for users holding `customer.read`: a customer list (server-side search,
+  Active/Inactive/All and B2B/B2C filters, paging of 25), a New customer form (sections: Basic details, Tax details, Billing address,
+  Shipping address, Contact, Other details), an Edit form, Deactivate / Reactivate with confirmation, a read-only view for users without
+  `customer.write`, and loading, empty, no-match and error states. Verified by component tests, tests that drive the real UI against the
+  real API and PostgreSQL, and a visual review (list with records, empty state, B2B registered form with validation errors, B2C form, edit,
+  inactive customer).
+- **Database (migration `20261022000000_task_1_9_customers`):** `customers` (internal UUID key; stable per-organization `code`; type B2C/B2B;
+  names; contact; GST status and GSTIN; PAN; billing address with GST state code; shipping address held only when different from billing;
+  place-of-supply state code as a stored fact for Task 1.12; credit limit; payment terms; notes; active flag; timestamps; `version`) and
+  `customer_code_counters`. Database rules: code format, unique `(organization, code)`, one GSTIN per organization (partial unique index),
+  GSTIN required for registered / forbidden for unregistered, B2C must be unregistered, GSTIN/PAN/state/PIN/country formats, non-negative credit limit,
+  payment terms 0-365, shipping-column consistency, and a trigger that makes customers **undeletable** and their id, organization, code and creation time
+  **immutable**. Tested on a clean database and on a populated Task 1.8 database (existing rows unchanged), including every constraint.
+- **Service (`@commercebill/customers`):** pure validation shared with the UI (same rules, value-free problem codes), organization-scoped service,
+  generated codes `CUS-000001...` from a locked per-organization counter (a hand-typed code is also accepted, upper-cased; generated codes skip taken numbers;
+  concurrent creations get distinct codes), optimistic concurrency by `version`, no-op edits change nothing, deactivation instead of deletion.
+- **API (behind the launch secret, `requireAuthenticatedUser` + `requirePermission`; organization from the session):** `GET /customers`,
+  `GET /customers/:id`, `POST /customers`, `PATCH /customers/:id` (needs `expectedVersion`), `POST /customers/:id/activate|deactivate`. Read =
+  `customer.read`, write = `customer.write`. There is no DELETE. A stale version is 409 `DB_0002`; duplicate code/GSTIN is 409 `BIZ_0001` with a field problem;
+  other organizations' customers are 404.
+- **Audit:** `customer.create`, `customer.update`, `customer.deactivate`, `customer.activate` (category business, actor, organization, customer id,
+  correlation id). Update rows list the changed field NAMES and only non-personal values (type, GST status, payment terms, credit limit, flags); names,
+  phones, e-mail, addresses, GSTIN, PAN and notes are never written to the audit log.
+- **Logging fix found by this task:** the API logged full URLs, so a customer search by phone, e-mail or GSTIN would have put personal data in the logs.
+  The request logger now writes the path only (`?[query redacted]`). Tested at trace level.
+- **Search bug found by tests and fixed:** `%` and `_` typed into search acted as wildcards (a search for `%` returned every customer). They are now escaped
+  and matched literally (a customer named `Fifty%Off Traders` is found by `Fifty%Off`).
+- **GST scope kept separate from tax:** the customer records GST status, GSTIN, billing/shipping state and place of supply as facts; no tax is
+  calculated (Task 1.12). A GSTIN is checked for FORMAT and check character and for consistency with the billing state and PAN; **no portal check is made
+  and nothing claims a GSTIN belongs to a real business** (the form says so). R-040 and R-053 stay open.
+- **Tests:** +41 unit net, +9 migration tests, +30 HTTP API tests (authorization by role template, isolation, concurrency, audit, logs) and +10 real-UI tests.
+  Mutation checks (see report) each failed at least one test; sources restored and verified identical.
+- **Existing tests changed:** the backup-spike table count 19 -> 21; three shell navigation tests now treat Customers as a real link (Billing is used for the
+  "Coming soon" assertions); the fake API helper records query strings; the test `call` helper accepts PATCH; the reference-seed test now asserts that the `customers` table stays EMPTY after seeding (it used to assert the table did not exist); the Task 1.7 real-API test expects four "Coming soon" entries; the unit-test timeout is 15 s (see the completion report).
+
 ## Task 1.8 results (first-run setup wizard UI; see docs/PHASE_1_TASK_1_8_COMPLETION_REPORT.md, ADR-0019)
 
 - **Visible result:** a fresh installation opens an 8-step setup wizard (Welcome, Business details, Address & location,
@@ -311,34 +348,28 @@ dashboards, template designer).
 
 ## Exact next task
 
-**Phase 1, Task 1.9 - Customer master vertical slice** (see "Approved Phase 1 roadmap"). Proposed scope and acceptance criteria;
-not started - do not begin without approval.
+**Phase 1, Task 1.10 - Product master vertical slice** (see "Approved Phase 1 roadmap"). Proposed scope and acceptance criteria; not started - do not
+begin without approval. It follows the Task 1.9 pattern exactly (database -> migration -> service -> validation -> API -> authorization -> organization
+isolation -> audit -> UI -> tests -> visual review).
 
-Scope (database -> service -> API -> authentication -> permission -> organization scope -> validation -> audit -> UI -> tests):
-
-1. **Database:** `customers` table (and a table for shipping addresses) per spec section 12, limited to what the first billing
-   workflow needs: id, organization, customer code (unique per organization, generated or entered), type (individual/business),
-   legal name, display name, contact person, email, primary and alternate phone, billing address (lines, city, state code, PIN,
-   country), GST status, GSTIN, PAN, place-of-supply state, payment terms (days), credit limit (decimal), notes, active flag,
-   created/updated timestamps and `version`. Opening balance, price list, tags, tax-exemption status, marketplace reference
-   and attachments are explicitly deferred (record in the matrix). Migration + migration test; forward-only.
-2. **Rules:** GSTIN format and checksum and state/PAN consistency (reuse the setup validators); a registered business customer
-   needs a GSTIN; unregistered must not have one; duplicate checks on code, GSTIN and normalised name within the organization
-   (hard error for duplicate code/GSTIN, warning for similar name); optimistic concurrency with `version`; soft deactivate only
-   (customers are never deleted once referenced).
-3. **API (all behind the launch secret and `requireAuthenticatedUser` + `requirePermission`):** `GET /customers` (search,
-   filter by active/GST status, sort, pagination limit <= 100), `GET /customers/:id`, `POST /customers`, `PUT /customers/:id`
-   (with `expectedVersion`), `POST /customers/:id/deactivate` and `/activate`. Read = `customer.read`, write/deactivate =
-   `customer.write`. Organization taken from the session; other-organization ids are 404; value-free validation problems.
-4. **Audit:** `customer.create`, `customer.update` (changed field names only, never PAN/GSTIN/phone values in clear in logs),
-   `customer.deactivate`, `customer.activate`.
-5. **UI (real API, no mock data):** the Customers sidebar entry becomes available for users with `customer.read`; list with
-   search, filters, sorting, paging, empty state; create/edit form with inline and server validation and a duplicate-warning
-   step; detail view; deactivate/activate with confirmation; read-only presentation for users without `customer.write`.
-6. **Acceptance tests:** 401 without a session and 403 per role template lacking the key, success for permitted roles;
-   organization isolation (Org A cannot list/read/change Org B customers); GSTIN rules including checksum and state/PAN
-   mismatch; duplicate code/GSTIN refused; concurrent edit conflict via `version`; audit rows exist and hold no personal data
-   values; UI tests for list/search/create/edit/deactivate against the real API and a real PostgreSQL database; migration test;
-   all existing gates green, thresholds unchanged.
-7. **Out of scope:** customer statements, balances/ageing, credit-note balance, import/export, merge, attachments, price lists,
-   marketplace references, multiple shipping addresses beyond one optional shipping address (decide in the task design).
+1. **Database / migration:** `products` (internal UUID key; stable per-organization `sku` code, generated `PRD-000001` by default or typed; name; description;
+   kind GOODS or SERVICE; HSN/SAC code text validated against the existing `hsn_sac_codes` reference (HSN for goods, SAC for services); unit of measure by reference to
+   the organization's `units`; default `tax_category` reference to the organization's `tax_categories`; selling price (decimal, 2 places) and a "price includes tax" flag;
+   `track_inventory` flag (only GOODS); barcode optional; active flag; timestamps; `version`). DB rules: sku format and per-organization uniqueness, price >= 0,
+   SERVICE cannot track inventory, trigger making products undeletable with immutable id/organization/sku, `(organization, barcode)` unique where present.
+   Purchase cost, margin, variants, price lists, images, categories/brands and e-commerce identifiers are deferred and recorded in the matrix (DEF-04 variants stays).
+   Design guard: invoice and stock lines will reference a "sellable item" so variants can be added later. Migration test on a clean database and on a populated
+   Task 1.9 database (customers and setup data unchanged).
+2. **API (launch secret + session + exact keys):** `GET /products` (search by sku/name/barcode/HSN, filters kind/active/tracked, paging <= 100), `GET /products/:id`,
+   `POST /products`, `PATCH /products/:id` (`expectedVersion`), `POST /products/:id/activate|deactivate`; read = `product.read`, write = `product.write`; no DELETE;
+   organization from the session; value-free problems; 409 `DB_0002` on a stale version, 409 `BIZ_0001` on duplicate sku/barcode; **cost and margin fields are
+   not exposed** (`product.cost.read` / `product.margin.read` unused until a cost field exists).
+3. **Audit:** `product.create`, `product.update` (changed field names; price changes record before/after price), `product.deactivate`, `product.activate`; request-log query
+   redaction already in place.
+4. **UI (real API, no mock data):** the Products sidebar entry for `product.read`; list with search, filters and paging; new/edit form (Basic details, Classification
+   and tax: HSN/SAC lookup against the reference list, unit, default tax category with the R-040 notice that rates are unreviewed placeholders, Pricing, Inventory tracking
+   flag); deactivate/reactivate; read-only view without `product.write`; loading, empty, no-match, error states; stock figures are NOT shown (Task 1.11).
+5. **Acceptance tests:** every Task 1.9 test category for products (create goods and service, validation incl. HSN/SAC kind and tracked-service refusal, sku uniqueness per
+   organization, pagination, search, edit, deactivate/reactivate, optimistic-concurrency conflict, 401/403 per role template, organization isolation list/read/edit,
+   audit rows without unnecessary data, logs); real-UI create/edit/search/close-and-reopen tests; visual review; all gates green, thresholds unchanged.
+6. **Out of scope:** inventory quantities and movements (Task 1.11), tax calculation (Task 1.12), invoices, variants, price lists, CSV import/export, images.
