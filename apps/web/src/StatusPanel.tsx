@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Card } from '@commercebill/ui';
 import { ApiRequestError, fetchDbHealth, fetchHealth } from './api.js';
 
 function describeFailure(error: unknown): string {
@@ -12,9 +13,8 @@ export function StatusPanel() {
   const db = useQuery({ queryKey: ['health', 'db'], queryFn: fetchDbHealth, retry: false });
 
   return (
-    <section aria-label="System status" className="rounded border p-4">
-      <h2 className="mb-2 text-lg font-medium">System status</h2>
-      <dl className="grid grid-cols-[10rem_1fr] gap-y-1">
+    <Card title="System status">
+      <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm font-medium text-slate-900 [&>dt]:font-normal [&>dt]:text-slate-500">
         <dt>API</dt>
         <dd data-testid="api-status">
           {api.isPending
@@ -34,6 +34,6 @@ export function StatusPanel() {
         <dt>Version</dt>
         <dd>{api.data?.version ?? '-'}</dd>
       </dl>
-    </section>
+    </Card>
   );
 }

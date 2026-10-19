@@ -130,11 +130,13 @@ describe('route boundary: launch secret, 401 vs 403, exact permission', () => {
     }
   });
 
-  it('GET /auth/me needs a session only', async () => {
+  it('GET /auth/me needs a session only, and reports organization name and role names for display', async () => {
     expect((await call(app, 'GET', '/auth/me')).status).toBe(401);
-    expect((await call(app, 'GET', '/auth/me', { token: tokens['Viewer/Auditor']! })).status).toBe(
-      200,
-    );
+    const me = await call(app, 'GET', '/auth/me', { token: tokens['Viewer/Auditor']! });
+    expect(me.status).toBe(200);
+    expect(me.json.organizationName).toBe('DEMO Auth Co (fictional)');
+    expect(me.json.roles).toEqual(['Viewer/Auditor']);
+    expect(me.body).not.toMatch(/argon2|passwordHash/i);
   });
 
   it('responses are not cacheable and never carry hashes or session material', async () => {

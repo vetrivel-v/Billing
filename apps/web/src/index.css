@@ -1,5 +1,26 @@
 @import 'tailwindcss';
 
+/* Utility classes used by the shared UI primitives live in another workspace package. */
+@source '../../../packages/ui/src';
+
+/* CommerceBill brand scale (teal-blue): calm, high-contrast on white, suitable for dense billing screens. */
+@theme {
+  --color-brand-50: #eef7fb;
+  --color-brand-100: #d5ebf5;
+  --color-brand-200: #aad6ea;
+  --color-brand-600: #0e6f96;
+  --color-brand-700: #0b5a7a;
+  --color-brand-800: #0a4963;
+  --color-brand-900: #083a50;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
 :root {
-  color-scheme: light dark;
+  /* The first release of the shell is light only; a dark theme is a later, separate decision. */
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
 }

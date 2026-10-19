@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-18 (after Phase 1 Task 1.6). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-19 (after Phase 1 Task 1.7). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                           |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.6 complete; Task 1.7 not started**                                                                                                                                                                                                         |
-| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                  |
-| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                      |
-| Last successful build     | 2026-10-18 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                         |
-| Last successful test run  | 2026-10-18 - `npm run verify:phase0` all 8 gates PASS; 251 unit + 276 integration tests (527) passed; coverage 96.5% statements / 92.0% branches / 98.9% functions / 98.2% lines (thresholds 80/70/80/80 unchanged)                                                           |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                               |
+| Item                      | Value                                                                                                                                                                                                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                 |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.7 complete; Task 1.8 not started**                                                                                                                                                                                                                               |
+| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                                        |
+| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                                            |
+| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                               |
+| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 295 unit + 288 integration tests (583) passed; coverage 96.4% statements / 91.9% branches / 98.4% functions / 98.3% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                    |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                     |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -185,7 +185,7 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 - **The backup code under tests/recovery/spikes is an experimental spike (in-memory, unencrypted, same schema version only). No production backup or restore exists.**
 - The launch secret is enforced only when the shell (or a test) supplies `LAUNCH_SECRET`; running the API alone in development (`npm run dev`) leaves the guard off. Production mode refuses to start without it.
-- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). Apart from the Task 1.6 user-administration routes, only test-only routes use the guards: no business route exists yet. Task 1.6 added the user-administration and password routes; there is still no login UI.
+- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). Apart from the Task 1.6 user-administration routes, only test-only routes use the guards: no business route exists yet. There is now a sign-in page, shell and dashboard (Task 1.7); the setup wizard screens are still missing, so a fresh installation shows "Setup required".
 - Docker Compose file was not executed (Docker not installed on this machine).
 - Electron smoke check and `npm run dev` startup were verified manually, not in the automated suite.
 - No Playwright, no pre-commit hook, no CI service, no OpenAPI document, no SBOM yet.
@@ -198,30 +198,90 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
 
+## Task 1.7 results (application shell + login UI; see docs/PHASE_1_TASK_1_7_COMPLETION_REPORT.md, ADR-0018)
+
+- **Visible result:** launching CommerceBill on a configured database now shows a real sign-in page (not the Phase 0
+  status page); after sign-in the shell and dashboard appear. Verified three ways: component tests, a jsdom DOM test
+  against the real Fastify API and a real PostgreSQL database, and the real Electron smoke test (first screen is chosen
+  from a launch-secret-protected call). The screens were also viewed in a browser against a throwaway API.
+- **Implemented:** HashRouter navigation; real API client (`apps/web/src/api.ts`); `/setup/status` launch check
+  ("Setup required" placeholder - the wizard is Task 1.8 - and "CommerceBill is not ready" with retry); login with one
+  generic failure message, client-side lockout feedback, 429 and unreachable-service wording; forced password change
+  (`AUTH_0004`) as the only reachable screen until done; voluntary change from the header; sign-out (revokes the session);
+  expired/ended session handling (absolute expiry, idle timeout with keep-alive while the user is active, 401 on any
+  request); permission-driven sidebar (Dashboard, Customers, Products, Inventory, Billing, Settings); dashboard with real
+  account, organization, role, session and live service-status data only.
+- **Session security:** the token lives only in a React ref (memory): never in localStorage, sessionStorage, the URL, the
+  DOM or logs (asserted by tests, including against the real token). The launch secret stays a separate header supplied by
+  the Electron bridge on every call.
+- **Reusable primitives:** new `@commercebill/ui` package: Button, TextInput, PasswordInput, Alert, Card, PageHeader,
+  Spinner/LoadingState, EmptyState, AppHeader/Sidebar/AppShell (skip link, focus-visible styles, aria attributes).
+- **Backend change (small, justified by the UI):** `GET /auth/me` also returns `organizationName` and `roles` (display only).
+- **Existing test changed:** the Electron smoke probe now reads the first screen heading instead of the Phase 0
+  status-panel test ids (the status page is no longer the home screen). The assertions about the secret, the loopback URL,
+  authorised/unauthorised calls and secret non-disclosure are unchanged.
+- **Dependency added:** `react-router` 8.4.0 (npm audit: 0 vulnerabilities). Coverage now also measures `.tsx` files.
+- **Tests:** +44 unit net (new UI-primitive, API-client and shell/auth/navigation/session tests; the three old App tests moved into the shell test file) and +12 DOM-against-real-API
+  integration tests. Mutation checks (unfiltered navigation, removed forced-change gate, token written to localStorage,
+  removed lockout hint, removed in-flight-session guard, ignored expiry) each failed at least one test; sources restored and
+  verified identical. One real defect was found by the tests and fixed: a keep-alive response arriving after sign-out could
+  have resurrected the session.
+
+## Approved Phase 1 roadmap: FIRST USABLE BILLING (approved 2026-10-19)
+
+**Milestone:** from the real Windows/Electron UI: start the app, complete first-run setup, create the administrator, log
+in, see the shell/dashboard, create a customer and a tracked product, confirm GST information, receive opening stock,
+create a sales invoice, calculate GST with the approved TaxEngine, post it, receive a permanent number (Task 1.5
+engine), reduce stock, hold the receivable state, produce an A4 invoice, print/export it as PDF, record full or
+partial payment, see the remaining customer balance, and close and reopen the application without losing anything.
+**The milestone is not complete until Task 1.18 passes.**
+
+| Task | Vertical slice                                                                                                                                                          | Class                                              |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 1.7  | Application shell + login UI (router, API client, `/setup/status` gate, login, lockout feedback, forced password change, permission-driven navigation, dashboard shell) | BLOCKER                                            |
+| 1.8  | Setup wizard UI                                                                                                                                                         | BLOCKER                                            |
+| 1.9  | Customer master vertical slice (database, service, API, permission, organization scope, validation, audit, UI, tests)                                                   | BLOCKER                                            |
+| 1.10 | Product master vertical slice                                                                                                                                           | BLOCKER                                            |
+| 1.11 | Inventory / stock ledger vertical slice                                                                                                                                 | BLOCKER                                            |
+| 1.12 | TaxEngine + GST configuration/review. **A short read-only TaxEngine design must be reviewed BEFORE any tax calculation is implemented**                                 | BLOCKER                                            |
+| 1.13 | Sales invoice domain + API                                                                                                                                              | BLOCKER                                            |
+| 1.14 | Billing UI + invoice preview/posting                                                                                                                                    | BLOCKER                                            |
+| 1.15 | A4 invoice PDF + print                                                                                                                                                  | BLOCKER                                            |
+| 1.16 | Payments + receivables                                                                                                                                                  | BLOCKER                                            |
+| 1.17 | Production backup + verified restore                                                                                                                                    | BLOCKER (moved before the final E2E by decision D) |
+| 1.18 | Dashboard basics + FIRST USABLE BILLING Electron E2E                                                                                                                    | BLOCKER                                            |
+
+Decisions recorded (all approved 2026-10-19):
+
+- **A - TaxEngine:** the Task 1.12 design must cover at least place of supply, intra-state CGST+SGST, inter-state IGST,
+  inclusive and exclusive pricing, discounts, additional/shipping charges, HSN/SAC association, nil-rated, exempt, non-GST,
+  cess extensibility, decimal precision, rounding, effective-dated rates and historical tax snapshots. **R-040 stays open
+  until the tax reference/rate data has had independent professional review; passing tests does not close it.**
+- **B - Receivable state:** receivables are `invoice total - allocated payments = outstanding balance`, held in
+  immutable invoice / payment / allocation records that Phase 2 accounting will later use as its source. **The Phase 2
+  double-entry journal engine is NOT part of this milestone.**
+- **C - Permission-denial audit:** deferred. The Audit Read API and the permission-denial audit-table feature are not
+  built before FIRST USABLE BILLING; R-063 stays open. Required business/security audit events keep being written with
+  the existing audit architecture.
+- **D - Backup:** production backup and verified restore (Task 1.17) happen before the final E2E (Task 1.18).
+- **Do not use real business financial records before backup/restore is verified AND R-040 reference data has been
+  independently reviewed.**
+
+Deferred (kept in REQUIREMENTS_MATRIX, status Deferred with the intended milestone): audit-log read API/filters/browsing
+(after Task 1.18), permission-denial audit rows (after Task 1.18, R-063), advanced user-management UI, role/permission
+editing, product variants (Phase 1 exit item; the invoice and stock lines reference a "sellable item" so variants can be
+added later), manual sales orders, credit notes/returns, customer statements, GST sales reports, CSV import/export
+(Phase 1 exit items after Task 1.18), scheduled backup and advanced backup UI, multi-warehouse UI beyond one default,
+and everything in Phases 2-5 (purchasing, full accounting reports, marketplaces, e-invoice, e-way bill, advanced
+dashboards, template designer).
+
 ## Exact next task
 
-**Phase 1, Task 1.7 - audit-log read API and auditing of authorization denials.** Proposed (not started; do not begin
-without approval). Requirement IDs T17-xx are assigned at the start.
-
-Why: Task 1.6 writes security audit events (`user.create`, `user.disable`, `user.enable`, `user.roles.changed`,
-`user.password.changed`, `user.password.reset`, `user.password.change_failed`) but nothing can read them, and a 403 is
-only logged, not audited (R-063). `security.audit.read` exists in the catalogue (Viewer/Auditor holds it).
-
-Scope:
-
-1. `GET /audit-logs` (`security.audit.read`): organization-scoped, keyset or limit/offset paging (limit <= 100), filters
-   by action, entity type/id, user and time range; returns no secret material; response shape documented.
-2. Record authorization denials (`auth.permission.denied`: user, route pattern, permission key, correlation id;
-   rate-limited or aggregated so a denied-request flood cannot flood the table - R-049 interaction) and AUTH_0004
-   blocks if wanted.
-3. Redaction check: a test that scans every audit row type for password material, hashes and tokens.
-4. Out of scope: any UI, export, retention/archival, hash chaining (R-017), role/permission editing, business routes.
-
-Acceptance criteria: 401 without a session; 403 for every role without `security.audit.read`; organization isolation
-(Org A cannot read Org B rows); paging bounds and invalid-query 400s; denial events created exactly once per denied
-request and containing no request body; audit rows stay append-only; `npm run verify:phase0` passes with the 527-test
-baseline not weakened and thresholds unchanged; PROJECT_STATE, REQUIREMENTS_MATRIX, RISK_REGISTER, an ADR and a
-completion report updated.
-
-Other open Phase 1 work, in no committed order: login/setup UI, P1-BKP-01 (production backup), tax engine,
-customers/products/inventory, invoicing, PDF, payments, reports, import/export.
+**Phase 1, Task 1.8 - Setup wizard UI** (see "Approved Phase 1 roadmap"). Proposed scope, not started; do not begin
+without approval: replace the "Setup required" placeholder with the real wizard on the existing Task 1.4/1.5 setup API
+(draft resume via `GET/PUT /setup/draft`, atomic `POST /setup/complete`, numbering and tax fields, value-free server
+problems mapped to field messages), then return to the sign-in page with a success notice (the API returns no session).
+Acceptance: a fresh database opens the wizard; a half-filled wizard resumes after closing the app; completing it creates
+the organization and administrator atomically and the new administrator can sign in; validation errors are shown per
+field without server text; no password is stored in the draft or the browser; component tests plus a DOM test against
+the real API and a real Electron start on an empty database; all gates green with thresholds unchanged.

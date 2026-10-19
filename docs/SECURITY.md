@@ -49,6 +49,10 @@ reviewed in the diff.
 - [x] User administration (Task 1.6): all routes behind launch secret + session + exact permission key; ceiling on role grants/revokes and on password-reset targets; no self role change; create-with-roles needs security.role.manage; organization taken from the session; cross-organization targets are 404 and cross-organization roles the same 400 as unknown roles
 - [x] Password change/reset (Task 1.6): current password required, wrong one is 400 and counts toward lockout, policy and reuse checks, Argon2id, other sessions revoked, no password material in responses, logs or audit
 - [x] Forced password change enforced (AUTH_0004); last usable administrator protected by the database for every path, including concurrency
+- [x] Sign-in UI (Task 1.7): one generic failure for every cause, no username oracle (lockout hint identical for unknown and known names), no technical text, password field cleared after each attempt
+- [x] Session token memory-only in the renderer (never storage, URL, DOM or logs) and separate from the launch secret; sign-out revokes the session; idle/absolute expiry and 401 handling; in-flight responses cannot resurrect an ended session
+- [x] Navigation derived from permissions, never role names (the server still enforces every route)
+- [ ] Automated accessibility audit (planned, R-069)
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)
 - [x] IPC sender-URL validation and app:// path-traversal protection (Task 1.2)

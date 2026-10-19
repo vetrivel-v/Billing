@@ -5,11 +5,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reportsDirectory: 'coverage',
-      include: ['packages/*/src/**/*.ts', 'apps/*/src/**/*.{ts,tsx}'],
+      include: ['packages/*/src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}'],
       exclude: [
         '**/generated/**',
         // Test infrastructure; exercised by the integration run in a separate process.
         'packages/test-utilities/**',
+        // Scripted API stand-in for component tests; not application code.
+        'apps/web/src/test-support/**',
         '**/*.test.*',
         'apps/*/src/main.ts*',
         'apps/desktop/src/preload.ts',
@@ -24,7 +26,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: [
-            'packages/**/*.test.ts',
+            'packages/**/*.test.{ts,tsx}',
             'apps/**/*.test.{ts,tsx}',
             'tests/unit/**/*.test.ts',
             'tests/security/**/*.test.ts',
@@ -36,7 +38,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'integration',
-          include: ['**/*.int.test.ts'],
+          include: ['**/*.int.test.{ts,tsx}'],
           exclude: ['**/node_modules/**'],
           globalSetup: ['tests/integration/global-setup.ts'],
           testTimeout: 60_000,

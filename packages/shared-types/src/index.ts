@@ -82,6 +82,9 @@ export interface LoginResponse {
 /** GET /auth/me body: who the server believes the caller is, and what they may do. */
 export interface MeResponse {
   user: { id: string; username: string; displayName: string; organizationId: string };
+  /** Display only: the organization's name and the user's role names. */
+  organizationName: string;
+  roles: string[];
   /** Stable permission keys (e.g. "sales.invoice.post"). Informational: the server enforces them. */
   permissions: string[];
   mustChangePassword: boolean;

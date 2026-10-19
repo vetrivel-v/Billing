@@ -89,8 +89,9 @@ function runSmokeCheck(win: BrowserWindow): void {
             try { body = await r.json(); } catch { body = null; }
             return { status: r.status, code: body?.error?.code ?? null, db: body?.database?.status ?? null };
           };
-          const text = (id) => document.querySelector('[data-testid="' + id + '"]')?.textContent ?? null;
-          for (let i = 0; i < 60 && text('db-status') !== 'ok'; i++) {
+          // The first screen is chosen from the renderer's own call to the launch-secret-protected /setup/status.
+          const screen = () => document.querySelector('h1')?.textContent ?? null;
+          for (let i = 0; i < 60 && screen() === null; i++) {
             await new Promise((r) => setTimeout(r, 200));
           }
           return {
@@ -103,7 +104,7 @@ function runSmokeCheck(win: BrowserWindow): void {
             authorisedDb: await call('/health/db', true),
             unauthorisedDb: await call('/health/db', false),
             livenessWithoutSecret: await call('/health', false),
-            ui: { api: text('api-status'), db: text('db-status') },
+            ui: { screen: screen() },
           };
         })()`,
       )

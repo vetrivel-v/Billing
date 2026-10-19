@@ -650,6 +650,27 @@ export async function createAuthService(options: AuthServiceOptions) {
     }));
   }
 
+  /** What the shell shows about the signed-in user: organization name and role names (display only). */
+  async function getProfile(
+    auth: AuthContext,
+  ): Promise<{ organizationName: string; roles: string[] }> {
+    const [org, roles] = await Promise.all([
+      prisma.organization.findUnique({
+        where: { id: auth.organizationId },
+        select: { legalName: true, tradeName: true },
+      }),
+      prisma.role.findMany({
+        where: { organizationId: auth.organizationId, users: { some: { userId: auth.userId } } },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+    return {
+      organizationName: org?.tradeName?.trim() || org?.legalName || '',
+      roles: roles.map((r) => r.name),
+    };
+  }
+
   async function listRoles(organizationId: string): Promise<RoleView[]> {
     const rows = await prisma.role.findMany({
       where: { organizationId },
@@ -1079,6 +1100,7 @@ export async function createAuthService(options: AuthServiceOptions) {
     disableUser,
     enableUser,
     getPermissions,
+    getProfile,
     listRoles,
     listUsers,
     getUser,

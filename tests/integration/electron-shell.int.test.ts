@@ -23,7 +23,7 @@ interface SmokeResult {
   authorisedDb: { status: number; code: string | null; db: string | null };
   unauthorisedDb: { status: number; code: string | null; db: string | null };
   livenessWithoutSecret: { status: number };
-  ui: { api: string | null; db: string | null };
+  ui: { screen: string | null };
   secretInApiOutput: boolean;
   secretFingerprint: string | null;
 }
@@ -108,8 +108,10 @@ describe('Electron shell supplies the launch secret to the API (P1-SEC-01)', () 
     expect(result.unauthorisedDb).toMatchObject({ status: 401, code: 'AUTH_0001' });
     expect(result.livenessWithoutSecret.status).toBe(200);
 
-    // The React app itself reached the API using the shell-supplied secret.
-    expect(result.ui).toEqual({ api: 'ok', db: 'ok' });
+    // The React app itself reached the API using the shell-supplied secret: its first screen is chosen from a
+    // launch-secret-protected call (/setup/status). This database has no organization, so the app shows "Setup required";
+    // without a working secret it would show "CommerceBill is not ready" instead.
+    expect(result.ui).toEqual({ screen: 'Setup required' });
 
     // The API's captured output never contains the secret.
     expect(result.secretInApiOutput).toBe(false);

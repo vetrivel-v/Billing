@@ -149,6 +149,7 @@ export async function registerAuthRoutes(
       { preHandler: requireAuthenticatedUser },
       async (req): Promise<MeResponse> => {
         const a = req.auth!;
+        const profile = await app.authService!.getProfile(a);
         return {
           user: {
             id: a.userId,
@@ -156,6 +157,8 @@ export async function registerAuthRoutes(
             displayName: a.displayName,
             organizationId: a.organizationId,
           },
+          organizationName: profile.organizationName,
+          roles: profile.roles,
           permissions: [...a.permissions].sort(),
           mustChangePassword: a.mustChangePassword,
           sessionExpiresAt: a.sessionExpiresAt.toISOString(),
