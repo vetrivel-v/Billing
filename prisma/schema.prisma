@@ -56,6 +56,8 @@ model Organization {
   warehouses                Warehouse[]
   customers                 Customer[]
   customerCodeCounter       CustomerCodeCounter?
+  products                  Product[]
+  productCodeCounter        ProductCodeCounter?
   users                     User[]
   roles                     Role[]
   documentSequences         DocumentSequence[]
@@ -345,6 +347,7 @@ model TaxCategory {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   rates        TaxRate[]
+  products     Product[]
 
   @@unique([organizationId, code])
   @@map("tax_categories")
@@ -387,6 +390,8 @@ model HsnSacCode {
   description String?
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  products Product[]
+
   @@map("hsn_sac_codes")
 }
 
@@ -402,6 +407,7 @@ model Unit {
   version        Int      @default(1)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  products     Product[]
 
   @@unique([organizationId, code])
   @@map("units")
@@ -472,6 +478,61 @@ model CustomerCodeCounter {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@map("customer_code_counters")
+}
+
+// ---------------------------------------------------------------------------
+// Products (Task 1.10)
+// ---------------------------------------------------------------------------
+
+/// A sellable item of one organization. `id` is the stable identity that invoice lines and stock movements will
+/// reference (see ADR-0021 for how variants can be added later without touching posted history). `sku` is the
+/// human-facing code: unique per organization, immutable once created. `kind` (GOODS or SERVICE) is immutable too.
+/// Products are never deleted - they are made inactive. The row stores tax CONFIGURATION (HSN/SAC and a tax-category
+/// reference) only; no rate is copied here and no tax is calculated here (Task 1.12). There is no quantity column:
+/// the Task 1.11 stock ledger will be the only source of stock truth.
+model Product {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  sku              String
+  name             String
+  description      String?
+  kind             String
+  hsnSacCodeId     String?  @map("hsn_sac_code_id") @db.Uuid
+  unitId           String?  @map("unit_id") @db.Uuid
+  taxCategoryId    String   @map("tax_category_id") @db.Uuid
+  mrp              Decimal? @db.Decimal(18, 2)
+  sellingPrice     Decimal  @map("selling_price") @db.Decimal(18, 2)
+  /// true: the selling price already includes GST; false: GST is added on top. Display/config only.
+  priceIncludesTax Boolean  @default(false) @map("price_includes_tax")
+  /// Only GOODS may track inventory (CHECK). Whether stock exists is the Task 1.11 ledger's business.
+  trackInventory   Boolean  @default(false) @map("track_inventory")
+  barcode          String?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version          Int      @default(1)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  hsnSacCode   HsnSacCode?  @relation(fields: [hsnSacCodeId], references: [id], onDelete: Restrict)
+  unit         Unit?        @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  taxCategory  TaxCategory  @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
+
+  // A barcode is unique per organization when present (partial unique index in the migration).
+  @@unique([organizationId, sku])
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("products")
+}
+
+/// Per-organization counter behind generated SKUs (PRD-000001, ...), advanced under a row lock in the creating transaction.
+model ProductCodeCounter {
+  organizationId String   @id @map("organization_id") @db.Uuid
+  lastNumber     BigInt   @default(0) @map("last_number")
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("product_code_counters")
 }
 
 // ---------------------------------------------------------------------------

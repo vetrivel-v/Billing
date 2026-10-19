@@ -158,6 +158,18 @@ cleared or changed). Existing violating rows make the migration abort atomically
 - New table `customer_code_counters` (one row per organization, `last_number >= 0`) behind generated codes, advanced under a row lock inside the creating transaction.
 - Existing tables and rows are untouched (tested against a populated Task 1.8 database).
 
+### 3.7 Changes in migration `20261023000000_task_1_10_products` (Task 1.10)
+
+- New table `products`: internal UUID id; `organization_id` (FK, restrict); `sku` (unique per organization, immutable); `name`, `description`; `kind` (GOODS | SERVICE, immutable);
+  `hsn_sac_code_id` (FK to the global `hsn_sac_codes`, optional), `unit_id` (FK to `units`, required for goods), `tax_category_id` (FK to `tax_categories`, required);
+  `mrp` and `selling_price` `numeric(18,2)`; `price_includes_tax`; `track_inventory`; `barcode` (unique per organization when present); `is_active`; timestamps; `version`.
+  There is deliberately NO quantity or stock column (the Task 1.11 ledger will own stock) and NO tax rate (the Task 1.12 engine reads the effective-dated rates).
+  CHECKs: sku and barcode formats, non-negative prices, goods have a unit, a service cannot track inventory, name present, version >= 1. Indexes: `(organization_id, is_active)`,
+  `(organization_id, name)`. Trigger `products_protect_identity` blocks DELETE and any change of id, organization, sku, kind or creation time. Trigger `products_check_references`
+  requires the unit and tax category to belong to the product's organization and the HSN/SAC code to be HSN for goods and SAC for services.
+- New table `product_code_counters` (one row per organization, `last_number >= 0`) behind generated SKUs, advanced under a row lock inside the creating transaction.
+- Existing tables and rows are untouched (tested against a populated Task 1.9 database).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

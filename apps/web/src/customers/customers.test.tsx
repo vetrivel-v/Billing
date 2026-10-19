@@ -203,6 +203,30 @@ describe('customer list', () => {
     expect(await screen.findByText('Showing 1-25 of 30')).toBeTruthy();
   });
 
+  it('a new search term returns to the first page, and Next right after clearing it still works', async () => {
+    const calls = await open('/customers', WRITE, {
+      'GET /customers': (req) => {
+        const q = new URLSearchParams(req.query);
+        const offset = Number(q.get('offset'));
+        const searching = q.has('search');
+        const total = searching ? 3 : 30;
+        const n = searching ? 3 : offset === 0 ? 25 : 5;
+        const customers = Array.from({ length: n }, () => customer());
+        return { status: 200, body: { customers, total, limit: 25, offset } };
+      },
+    });
+    expect(await screen.findByText('Showing 1-25 of 30')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Showing 26-30 of 30')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'abc' } });
+    expect(await screen.findByText('Showing 1-3 of 3')).toBeTruthy(); // back on the first page for the new term
+    expect(new URLSearchParams(customerCalls(calls).at(-1)!.query).get('offset')).toBe('0');
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '' } });
+    expect(await screen.findByText('Showing 1-25 of 30')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' })); // immediately after the term changed back
+    expect(await screen.findByText('Showing 26-30 of 30')).toBeTruthy();
+  });
+
   it('a read-only user sees Open instead of Edit and no New customer button', async () => {
     const c = customer({ legalName: 'Readable Co' });
     await open('/customers', READ, { 'GET /customers': listOf([c]) });
@@ -237,7 +261,9 @@ describe('new customer form', () => {
     }
     expect((screen.getByRole('radio', { name: /^B2B/ }) as HTMLInputElement).checked).toBe(true);
     expect(section('Tax details').queryByLabelText(/^GSTIN/)).toBeNull();
-    expect(document.activeElement).toBe(labelled(section('Basic details'), 'Customer name'));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(labelled(section('Basic details'), 'Customer name')),
+    );
     expect(section('Basic details').getByText(/Leave blank to generate/)).toBeTruthy();
   });
 

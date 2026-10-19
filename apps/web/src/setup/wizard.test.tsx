@@ -158,8 +158,10 @@ describe('navigation and validation', () => {
     expect(current?.textContent).toContain('Business details');
     click('Continue');
     await fillAddress();
-    expect(document.activeElement).toBe(
-      screen.getByRole('heading', { name: 'Address & location' }),
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('heading', { name: 'Address & location' }),
+      ),
     );
     click('Back');
     await onStep('Business details');
@@ -485,7 +487,8 @@ describe('review and completion', () => {
     ).toBeTruthy();
     expect((field('Username') as HTMLInputElement).value).toBe(SAMPLE.admin.username);
     expect((field('Password') as HTMLInputElement).value).toBe('');
-    expect(document.activeElement).toBe(field('Password')); // the username is filled: start at the password
+    // the username is filled: focus moves to the password (an effect that runs just after the heading appears)
+    await waitFor(() => expect(document.activeElement).toBe(field('Password')));
     // no authentication call of any kind was made, and the completion body held the password exactly once
     expect(calls.some((c) => c.path.startsWith('/auth/'))).toBe(false);
     expect(s.completes).toHaveLength(1);

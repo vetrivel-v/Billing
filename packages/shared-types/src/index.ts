@@ -156,3 +156,52 @@ export interface CustomerListResponse {
   limit: number;
   offset: number;
 }
+
+// -------------------------------------------------------------------------------------------------- products
+
+export type ProductKind = 'GOODS' | 'SERVICE';
+
+/** A product as the API returns it. Money is an exact decimal STRING with two places (never a JSON number). */
+export interface ProductView {
+  id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  kind: ProductKind;
+  hsnSacCodeId: string | null;
+  hsnSacCode: { code: string; kind: 'HSN' | 'SAC'; description: string | null } | null;
+  unitId: string | null;
+  unit: { code: string; name: string; decimalPlaces: number } | null;
+  taxCategoryId: string;
+  taxCategory: { code: string; name: string; classification: string };
+  mrp: string | null;
+  sellingPrice: string;
+  /** true: the selling price already includes GST; false: GST is added on top. Configuration only. */
+  priceIncludesTax: boolean;
+  trackInventory: boolean;
+  barcode: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface ProductListResponse {
+  products: ProductView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Reference lists the product form selects from (organization-scoped, active entries only). */
+export interface ProductReferencesResponse {
+  units: { id: string; code: string; name: string; decimalPlaces: number }[];
+  taxCategories: { id: string; code: string; name: string; classification: string }[];
+  /** How many HSN/SAC codes exist in the reference list (0 = the list has not been loaded). */
+  hsnSacTotal: number;
+}
+
+export interface HsnSacSearchResponse {
+  codes: { id: string; code: string; kind: 'HSN' | 'SAC'; description: string | null }[];
+  total: number;
+}

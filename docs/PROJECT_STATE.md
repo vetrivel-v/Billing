@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-19 (after Phase 1 Task 1.9). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-19 (after Phase 1 Task 1.10). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                                             |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.9 complete; Task 1.10 not started**                                                                                                                                                                                                                                                                          |
-| Current database version  | `20261022000000_task_1_9_customers` (21 tables: Task 1.9 added `customers` and `customer_code_counters`)                                                                                                                                                                                                                                        |
-| Last successful migration | `20261022000000_task_1_9_customers` - applied to clean databases by every integration file and to a populated Task 1.8 database by its migration test, 2026-10-19                                                                                                                                                                               |
-| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                                           |
-| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 384 unit + 344 integration tests (728) passed; coverage 95.7% statements / 91.3% branches / 97.4% functions / 97.2% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                                                |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = `7cdc2a7`; Task 1.9 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                                                 |
+| Item                      | Value                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                                                                    |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.10 complete; Task 1.11 not started**                                                                                                                                                                                                                                                                                                |
+| Current database version  | `20261023000000_task_1_10_products` (23 tables: Task 1.10 added `products` and `product_code_counters`)                                                                                                                                                                                                                                                                |
+| Last successful migration | `20261023000000_task_1_10_products` - applied to clean databases by every integration file and to a populated Task 1.9 database by its migration test, 2026-10-19                                                                                                                                                                                                      |
+| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                                                                  |
+| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 432 unit + 395 integration tests (827) passed; coverage 95.5% statements / 91.0% branches / 97.3% functions / 96.9% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                                                                       |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = `7cdc2a7`; Task 1.9 = `7fb72f3`; Task 1.10 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                                                                        |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -198,6 +198,49 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
 
+## Task 1.10 results (product master vertical slice; see docs/PHASE_1_TASK_1_10_COMPLETION_REPORT.md, ADR-0021)
+
+- **Visible result:** the Products sidebar entry is real for users holding `product.read`: a product list (server-side search by SKU, name,
+  barcode or HSN/SAC prefix; Active/Inactive/All, Goods/Services and Tracked/Not-tracked filters; paging of 25; loading, empty, no-match and error
+  states), a New product form (Basic details, Classification, Tax, Pricing, Inventory settings), an Edit form, Deactivate / Reactivate with confirmation,
+  and a read-only view for users without `product.write`. The price area says plainly whether the price "includes GST" or is "+ applicable GST" and
+  echoes the rupee amount (Indian grouping); it shows NO GST amount and NO tax breakdown. Verified by component tests, tests that drive the real UI
+  against the real API and PostgreSQL, and a visual review (empty list, populated list, goods form, service form, validation errors, edit, inactive, read-only,
+  column widths at 1000, 1100 and 1280 px).
+- **Database (migration `20261023000000_task_1_10_products`):** `products` (internal UUID key; per-organization stable `sku`; `kind` GOODS | SERVICE; name;
+  description; HSN/SAC reference; unit reference; tax-category reference; `mrp` and `selling_price` as `numeric(18,2)`; `price_includes_tax`;
+  `track_inventory`; barcode; active flag; timestamps; `version`) and `product_code_counters`. Rules in the database: sku/barcode formats, unique
+  `(organization, sku)` and `(organization, barcode)`, non-negative prices, goods need a unit, a service can never track inventory, **no quantity or stock column**,
+  a trigger that makes products **undeletable** and their id, organization, sku, kind and creation time **immutable**, and a trigger that only allows the
+  organization's OWN unit and tax category and an HSN code for goods / SAC code for services. Tested on a clean database and on a populated Task 1.9 database
+  (organization, user, location, customer, units and tax categories unchanged).
+- **Money is exact:** prices are decimal strings end to end - browser form, API JSON, validation, `numeric(18,2)` column and display. No JavaScript number
+  is used for money (a JSON number is accepted only through its exact text and anything inexact such as 0.1+0.2 is refused). A third decimal place is refused,
+  never rounded. A value like 1234567890123456.78 survives the browser, the API and PostgreSQL. No "selling price <= MRP" rule is imposed.
+- **Service (`@commercebill/products`):** pure validation shared with the UI (value-free problem codes), organization-scoped service, generated SKUs
+  `PRD-000001...` (typed SKUs are upper-cased; generated ones skip taken numbers), optimistic concurrency by `version`, reference checks (another organization's
+  unit or category looks exactly like an unknown id; a retired unit/category is refused for NEW use only), no-op edits change nothing, deactivation instead of deletion.
+- **API (launch secret + `requireAuthenticatedUser` + `requirePermission`; organization from the session):** `GET /products`, `GET /products/:id`, `POST /products`,
+  `PATCH /products/:id` (needs `expectedVersion`), `POST /products/:id/activate|deactivate`, plus the form's reference lookups `GET /products/references`
+  (own-organization active units and tax categories, and the size of the HSN/SAC list) and `GET /products/references/hsn-sac`. Read = `product.read`, write =
+  `product.write`; no DELETE; a stale version is 409 `DB_0002`; duplicate SKU/barcode is 409 `BIZ_0001`; other organizations' products are 404.
+- **Audit:** `product.create`, `product.update`, `product.deactivate`, `product.activate`. Update rows list changed field NAMES; values are recorded only for
+  price/MRP/price-basis/tracking/tax-category/unit/HSN-SAC identifiers/active flag (price traceability is the purpose of the audit, as recorded in the Task 1.10 criteria);
+  names, descriptions and barcodes are never written to audit rows. Prices, names, barcodes and search terms never appear in the server logs (tested at trace level).
+- **HSN/SAC reference list is EMPTY after seeding** (no reviewed data exists; the hsn_sac_codes table has never been populated). The product form says so
+  and lets the product be saved without a code; when codes exist, the picker searches the real list on the server and sends only the chosen id. No code is invented.
+  R-077 records that real HSN/SAC data needs a reviewed source.
+- **Variants guard (ADR-0021):** no separate sellable-item table now. `products.id` IS the sellable-item identity that invoice lines and stock movements will reference;
+  when variants arrive each existing product gets exactly one default variant whose id equals the product id, so posted lines and stock history stay valid.
+- **Defect found by the new tests and fixed:** after a successful create the form released its submit lock before the page navigated away, so a very late second
+  click could create a second record. The form (customers too) now stays locked until the page has gone (regression test added).
+- **Second defect, found by an intermittent test failure (not raised by a timeout):** the Customers list reset its page in an effect that could run AFTER a click on
+  Next and silently undo it (the new Products list had copied it). Both lists now reset the page during render when the search term changes, with a regression test; 12 of 12
+  repeat runs of both real-UI test files passed afterwards. A Task 1.8 wizard test that asserted keyboard focus before the focusing effect ran now waits for it. No timeout was raised.
+- **Tests:** +48 unit net and +51 integration tests (see report). Mutation checks (ten breaks, see report) each failed at least one test; sources restored and verified identical.
+- **Existing tests changed:** backup-spike table count 21 -> 23; the reference-seed test now asserts the `products` table stays EMPTY after seeding; two shell/Task 1.7
+  navigation tests count Products among the built modules.
+
 ## Task 1.9 results (customer master vertical slice; see docs/PHASE_1_TASK_1_9_COMPLETION_REPORT.md, ADR-0020)
 
 - **Visible result:** the Customers sidebar entry is now real for users holding `customer.read`: a customer list (server-side search,
@@ -348,28 +391,28 @@ dashboards, template designer).
 
 ## Exact next task
 
-**Phase 1, Task 1.10 - Product master vertical slice** (see "Approved Phase 1 roadmap"). Proposed scope and acceptance criteria; not started - do not
-begin without approval. It follows the Task 1.9 pattern exactly (database -> migration -> service -> validation -> API -> authorization -> organization
-isolation -> audit -> UI -> tests -> visual review).
+**Phase 1, Task 1.11 - Inventory / stock ledger vertical slice** (see "Approved Phase 1 roadmap"). Proposed scope and acceptance criteria; not started - do not
+begin without approval. It follows the Task 1.9/1.10 pattern (database -> migration -> service -> validation -> API -> authorization -> organization isolation ->
+audit -> UI -> tests -> visual review) and Task 1.5's concurrency discipline.
 
-1. **Database / migration:** `products` (internal UUID key; stable per-organization `sku` code, generated `PRD-000001` by default or typed; name; description;
-   kind GOODS or SERVICE; HSN/SAC code text validated against the existing `hsn_sac_codes` reference (HSN for goods, SAC for services); unit of measure by reference to
-   the organization's `units`; default `tax_category` reference to the organization's `tax_categories`; selling price (decimal, 2 places) and a "price includes tax" flag;
-   `track_inventory` flag (only GOODS); barcode optional; active flag; timestamps; `version`). DB rules: sku format and per-organization uniqueness, price >= 0,
-   SERVICE cannot track inventory, trigger making products undeletable with immutable id/organization/sku, `(organization, barcode)` unique where present.
-   Purchase cost, margin, variants, price lists, images, categories/brands and e-commerce identifiers are deferred and recorded in the matrix (DEF-04 variants stays).
-   Design guard: invoice and stock lines will reference a "sellable item" so variants can be added later. Migration test on a clean database and on a populated
-   Task 1.9 database (customers and setup data unchanged).
-2. **API (launch secret + session + exact keys):** `GET /products` (search by sku/name/barcode/HSN, filters kind/active/tracked, paging <= 100), `GET /products/:id`,
-   `POST /products`, `PATCH /products/:id` (`expectedVersion`), `POST /products/:id/activate|deactivate`; read = `product.read`, write = `product.write`; no DELETE;
-   organization from the session; value-free problems; 409 `DB_0002` on a stale version, 409 `BIZ_0001` on duplicate sku/barcode; **cost and margin fields are
-   not exposed** (`product.cost.read` / `product.margin.read` unused until a cost field exists).
-3. **Audit:** `product.create`, `product.update` (changed field names; price changes record before/after price), `product.deactivate`, `product.activate`; request-log query
-   redaction already in place.
-4. **UI (real API, no mock data):** the Products sidebar entry for `product.read`; list with search, filters and paging; new/edit form (Basic details, Classification
-   and tax: HSN/SAC lookup against the reference list, unit, default tax category with the R-040 notice that rates are unreviewed placeholders, Pricing, Inventory tracking
-   flag); deactivate/reactivate; read-only view without `product.write`; loading, empty, no-match, error states; stock figures are NOT shown (Task 1.11).
-5. **Acceptance tests:** every Task 1.9 test category for products (create goods and service, validation incl. HSN/SAC kind and tracked-service refusal, sku uniqueness per
-   organization, pagination, search, edit, deactivate/reactivate, optimistic-concurrency conflict, 401/403 per role template, organization isolation list/read/edit,
-   audit rows without unnecessary data, logs); real-UI create/edit/search/close-and-reopen tests; visual review; all gates green, thresholds unchanged.
-6. **Out of scope:** inventory quantities and movements (Task 1.11), tax calculation (Task 1.12), invoices, variants, price lists, CSV import/export, images.
+1. **Database / migration:** an append-only `stock_movements` ledger (internal UUID; organization; warehouse; product reference (the sellable-item identity, ADR-0021);
+   signed quantity `numeric(18,4)`; movement type OPENING | RECEIPT | ADJUSTMENT_IN | ADJUSTMENT_OUT (sales issue and returns arrive with invoicing); reason text;
+   document reference text for later documents; created_at, created_by) plus a derived balance per (warehouse, product) kept consistent by the database (a row-locked
+   `stock_balances` table or a trigger-maintained summary - decide in the design, never an editable quantity on `products`). Rules: only GOODS with `track_inventory`
+   can have movements (trigger); quantity is non-zero and respects the product unit's `decimal_places`; the warehouse and product belong to the organization; rows can never be
+   updated or deleted (trigger, as with the numbering ledger and audit log); the balance can never be negative unless an organization setting allows it (default: not allowed,
+   enforced in the database under the row lock); idempotency per `(organization, source reference)` so a retried operation cannot post twice. Migration test on a clean database
+   and a populated Task 1.10 database (products, customers, setup data unchanged), concurrency tests (parallel issues cannot overdraw; 40 parallel receipts add up exactly).
+2. **Warehouse:** use the one primary warehouse created at setup; no multi-warehouse UI (DEF-09). `GET /warehouses` (read-only, `warehouse.read`) for the screens.
+3. **API (launch secret + session + exact keys; organization from the session; no DELETE; value-free problems):** `GET /inventory/stock` (per product: on-hand, with search, tracked-only,
+   paging <= 100; `inventory.stock.read`), `GET /inventory/movements` (per product or all, paging; `inventory.stock.read`), `POST /inventory/opening-stock` and `POST /inventory/receipts`
+   (`inventory.adjustment.create`, quantity + optional note), `POST /inventory/adjustments` (increase/decrease with a required reason; `inventory.adjustment.create`; approval workflow is deferred).
+   No route edits or deletes a movement; a correction is a new opposite movement.
+4. **Audit:** `inventory.opening_stock`, `inventory.receipt`, `inventory.adjustment` with product id, warehouse id, quantity and reason; no free-text leakage into logs.
+5. **UI (real API, no mock data):** the Inventory sidebar entry for `inventory.stock.read`; a stock list (product, unit, on hand, tracked products only by default), a product stock page with its
+   movement history, and Receive stock / Opening stock / Adjust forms for writers; read-only for others. The Product screens stay free of quantities. After creating a tracked product the existing hint
+   "Stock can be added from Inventory" becomes true.
+6. **Acceptance tests:** every Task 1.10 test category for stock (exact decimal quantities with unit scale, untracked product and service rejected, negative balance refused, idempotent retry,
+   concurrency, append-only (update/delete refused at the database), 401/403 per role template, organization isolation, audit rows, logs, UI create/search/close-and-reopen against the real API); visual review;
+   all gates green, thresholds unchanged. Timeouts are NOT raised; any recurring slowness is investigated and recorded.
+7. **Out of scope:** invoicing and sales issues (Task 1.13), purchase receipts from suppliers, transfers between warehouses, reservations, valuation/costing, stock counts, serial/batch, CSV import.

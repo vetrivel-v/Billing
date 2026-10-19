@@ -54,10 +54,16 @@ export function CustomersPage() {
   const term = useDebounced(search.trim(), 300);
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [type, setType] = useState<'' | 'B2C' | 'B2B'>('');
-  const [page, setPage] = useState(0);
+  // The page belongs to the search term it was chosen for. A changed term resets the page DURING RENDER (React's
+  // supported "adjust state on prop change" pattern) rather than in an effect, which could run after a click on Next and
+  // silently undo it - and which would leave a remembered page behind for a term the user returns to.
+  const [paging, setPaging] = useState({ term, page: 0 });
+  if (paging.term !== term) setPaging({ term, page: 0 });
+  const page = paging.term === term ? paging.page : 0;
+  const setPage = (next: number | ((p: number) => number)) =>
+    setPaging({ term, page: typeof next === 'function' ? next(page) : next });
 
   // Any change of the search term returns to the first page.
-  useEffect(() => setPage(0), [term]);
 
   const query = {
     ...(term ? { search: term } : {}),
@@ -210,7 +216,9 @@ export function CustomersPage() {
                   <tr key={c.id} className="hover:bg-slate-50">
                     <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">{c.code}</td>
                     <td className="px-3 py-2">
-                      <div className="font-medium text-slate-900">{c.legalName}</div>
+                      <div className="max-w-md font-medium break-words text-slate-900">
+                        {c.legalName}
+                      </div>
                       {c.displayName && (
                         <div className="text-xs text-slate-500">{c.displayName}</div>
                       )}

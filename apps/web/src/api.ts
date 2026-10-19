@@ -7,6 +7,10 @@ import type {
   MeResponse,
   CustomerListResponse,
   CustomerView,
+  HsnSacSearchResponse,
+  ProductListResponse,
+  ProductReferencesResponse,
+  ProductView,
   SetupCompleteResponse,
   SetupStatusResponse,
 } from '@commercebill/shared-types';
@@ -219,3 +223,63 @@ export const setCustomerActive = (
     token,
     body: { expectedVersion },
   });
+
+// ---------------------------------------------------------------------------------------------- products
+
+export interface ProductQuery {
+  search?: string;
+  isActive?: boolean;
+  kind?: 'GOODS' | 'SERVICE';
+  tracked?: boolean;
+  limit: number;
+  offset: number;
+}
+
+export function listProducts(token: string, q: ProductQuery): Promise<ProductListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
+  if (q.kind) params.set('kind', q.kind);
+  if (q.tracked !== undefined) params.set('tracked', String(q.tracked));
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/products?${params.toString()}`, { token });
+}
+
+export const getProduct = (token: string, id: string): Promise<{ product: ProductView }> =>
+  callApi('GET', `/products/${encodeURIComponent(id)}`, { token });
+
+export const createProduct = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ product: ProductView }> => callApi('POST', '/products', { token, body });
+
+export const updateProduct = (
+  token: string,
+  id: string,
+  body: Record<string, unknown>,
+): Promise<{ product: ProductView }> =>
+  callApi('PATCH', `/products/${encodeURIComponent(id)}`, { token, body });
+
+export const setProductActive = (
+  token: string,
+  id: string,
+  active: boolean,
+  expectedVersion: number,
+): Promise<{ product: ProductView }> =>
+  callApi('POST', `/products/${encodeURIComponent(id)}/${active ? 'activate' : 'deactivate'}`, {
+    token,
+    body: { expectedVersion },
+  });
+
+export const getProductReferences = (token: string): Promise<ProductReferencesResponse> =>
+  callApi('GET', '/products/references', { token });
+
+export function searchHsnSac(
+  token: string,
+  q: { kind: 'HSN' | 'SAC'; search?: string; limit?: number },
+): Promise<HsnSacSearchResponse> {
+  const params = new URLSearchParams({ kind: q.kind, limit: String(q.limit ?? 20) });
+  if (q.search) params.set('search', q.search);
+  return callApi('GET', `/products/references/hsn-sac?${params.toString()}`, { token });
+}

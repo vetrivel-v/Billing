@@ -6,6 +6,8 @@ import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPa
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
 import { LoginPage } from './LoginPage.js';
+import { ProductFormPage } from './products/ProductFormPage.js';
+import { ProductsPage } from './products/ProductsPage.js';
 import { MODULES, visibleModules } from './nav.js';
 import { SetupWizard } from './setup/SetupWizard.js';
 import { BootingPage, DashboardPage, ModulePage, NotFoundPage, UnreachablePage } from './pages.js';
@@ -79,7 +81,33 @@ function Shell() {
             </Guarded>
           }
         />
-        {MODULES.filter((m) => m.key !== 'dashboard' && m.key !== 'customers').map((m) => (
+        <Route
+          path="/products"
+          element={
+            <Guarded module="products">
+              <ProductsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/products/new"
+          element={
+            <Guarded module="products">
+              <ProductFormPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <Guarded module="products">
+              <ProductFormPage />
+            </Guarded>
+          }
+        />
+        {MODULES.filter(
+          (m) => m.key !== 'dashboard' && m.key !== 'customers' && m.key !== 'products',
+        ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />
         ))}
         <Route path="/login" element={<Navigate to="/" replace />} />

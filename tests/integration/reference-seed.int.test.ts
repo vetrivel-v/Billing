@@ -436,19 +436,15 @@ describe('reference vs demo (F) and the CLI', () => {
     expect(before.organizations).toBe(1);
     // The customers table exists since Task 1.9, but reference seeding must never put a customer in it.
     expect(await prisma.customer.count()).toBe(0);
-    // No table for products/invoices/payments/stock/journals exists yet.
+    // The products table exists since Task 1.10, but reference seeding must never put a product in it.
+    expect(await prisma.product.count()).toBe(0);
+    // No table for invoices/payments/stock/journals exists yet.
     const tables = (
       await prisma.$queryRaw<
         { table_name: string }[]
       >`SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
     ).map((t) => t.table_name);
-    for (const t of [
-      'products',
-      'invoices',
-      'payments',
-      'inventory_movements',
-      'journal_entries',
-    ]) {
+    for (const t of ['invoices', 'payments', 'inventory_movements', 'journal_entries']) {
       expect(tables).not.toContain(t);
     }
   });

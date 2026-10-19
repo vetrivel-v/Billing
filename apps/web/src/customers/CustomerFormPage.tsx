@@ -125,6 +125,7 @@ export function CustomerFormPage() {
     setSummary(null);
     saveLock.current = true;
     setSaving(true);
+    let left = false;
     try {
       const body = toApiBody(form, creating);
       if (creating) {
@@ -133,6 +134,7 @@ export function CustomerFormPage() {
         navigate('/customers', {
           state: { notice: `Customer ${made.code} (${made.legalName}) was created.` },
         });
+        left = true; // the page is going away: keep the form locked so no second submit can slip in
         return;
       }
       const { customer: next } = await authed((t) =>
@@ -173,8 +175,10 @@ export function CustomerFormPage() {
         setSummary({ title: describeFailure(err) || UNEXPECTED, items: [] });
       }
     } finally {
-      saveLock.current = false;
-      setSaving(false);
+      if (!left) {
+        saveLock.current = false;
+        setSaving(false);
+      }
     }
   }
 
