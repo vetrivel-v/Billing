@@ -1,17 +1,17 @@
 # Project State
 
-Last updated: 2026-10-19 (after Phase 1 Task 1.7). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-19 (after Phase 1 Task 1.8). This file and the repository are the implementation record (spec section 44).
 
-| Item                      | Value                                                                                                                                                                                                                                                                                               |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                 |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.7 complete; Task 1.8 not started**                                                                                                                                                                                                                               |
-| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                                        |
-| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                                            |
-| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                               |
-| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 295 unit + 288 integration tests (583) passed; coverage 96.4% statements / 91.9% branches / 98.4% functions / 98.3% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                    |
-| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = the commit following it (see `git log`); no remote configured |
-| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                     |
+| Item                      | Value                                                                                                                                                                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                       |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.8 complete; Task 1.9 not started**                                                                                                                                                                                                                                                     |
+| Current database version  | `20261021000000_task_1_6_security_admin_invariant` (19 tables: Task 1.6 changed no table; it added one function, one trigger function and five deferred constraint triggers)                                                                                                                                              |
+| Last successful migration | `20261021000000_task_1_6_security_admin_invariant` - applied to clean databases by every integration file and to a populated previous-version database by its migration test, 2026-10-18                                                                                                                                  |
+| Last successful build     | 2026-10-19 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                     |
+| Last successful test run  | 2026-10-19 - `npm run verify:phase0` all 8 gates PASS; 343 unit + 295 integration tests (638) passed; coverage 96.2% statements / 91.3% branches / 98.3% functions / 97.6% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                          |
+| Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = the commit following it (see `git log`); no remote configured |
+| Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                           |
 
 ## Completed modules (Phase 0 scope only)
 
@@ -185,7 +185,7 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 - **The backup code under tests/recovery/spikes is an experimental spike (in-memory, unencrypted, same schema version only). No production backup or restore exists.**
 - The launch secret is enforced only when the shell (or a test) supplies `LAUNCH_SECRET`; running the API alone in development (`npm run dev`) leaves the guard off. Production mode refuses to start without it.
-- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). Apart from the Task 1.6 user-administration routes, only test-only routes use the guards: no business route exists yet. There is now a sign-in page, shell and dashboard (Task 1.7); the setup wizard screens are still missing, so a fresh installation shows "Setup required".
+- The setup routes are the only non-health, non-auth routes and are deliberately exempt from user authentication (bootstrap exception, ADR-0015). Apart from the Task 1.6 user-administration routes, only test-only routes use the guards: no business route exists yet. There is now a sign-in page, shell and dashboard (Task 1.7); the setup wizard now runs on a fresh installation (Task 1.8).
 - Docker Compose file was not executed (Docker not installed on this machine).
 - Electron smoke check and `npm run dev` startup were verified manually, not in the automated suite.
 - No Playwright, no pre-commit hook, no CI service, no OpenAPI document, no SBOM yet.
@@ -197,6 +197,40 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
+
+## Task 1.8 results (first-run setup wizard UI; see docs/PHASE_1_TASK_1_8_COMPLETION_REPORT.md, ADR-0019)
+
+- **Visible result:** a fresh installation opens an 8-step setup wizard (Welcome, Business details, Address & location,
+  GST registration, Financial year, Invoice numbering, Administrator, Review & complete). Completing it returns to the sign-in
+  page with the administrator's username filled in and **no session**; a configured installation shows sign-in and can never
+  reopen the wizard. Verified by component tests, tests that drive the real UI against the real API and a real empty PostgreSQL
+  database, the real Electron smoke start, and a visual review of Welcome, Business, Address, GST, Invoice numbering,
+  Administrator (with a validation error), Review and the success -> sign-in transition.
+- **No backend redesign.** The wizard uses only the existing Task 1.4/1.5 endpoints (`GET/PUT /setup/draft`, `GET /setup/status`,
+  atomic `POST /setup/complete`). Two browser-safe subpath exports were added (`@commercebill/setup/browser`,
+  `@commercebill/numbering/browser`) so the UI reuses the server's own validators, state-code list and number formatter.
+- **Fields reconciled against the API - nothing is collected that the server would discard.** Supported and shown: legal name,
+  trade name, business type, PAN, state, GST status and GSTIN, location name and address lines, city, PIN, warehouse name/code,
+  financial-year start, invoice prefix / first number / width, administrator name, username, email, password.
+  **Master-spec setup fields NOT supported by the backend and therefore NOT collected (deferred, see REQUIREMENTS_MATRIX DEF-11):**
+  business phone, email and website; country (India shown as fixed text, not stored); a separate "default place of supply"
+  (it is the business state); bank name / account name / account number / IFSC / UPI ID; backup destination; other
+  document-type prefixes and per-document starting numbers (standard defaults apply); an editable reset policy (always
+  per financial year). The review page and Welcome page say so plainly. No backup is claimed to be active (Task 1.17).
+- **Draft/resume:** non-secret fields are saved after each Continue/Back, serialised in order so quick clicks cannot collide or
+  overwrite newer data; Resume restores fields and lands on the first step needing attention (the Administrator step, because
+  the password is never saved); Start Over needs confirmation; a corrupted draft is reported as discarded by the existing backend.
+- **Password handling:** kept only in memory while the Administrator/Review steps exist; never in the draft, storage, URL, logs, audit,
+  the review page or the DOM outside the active inputs; a password the server rejects is dropped.
+- **Tax notice:** the GST step states that tax configuration should be reviewed before real use and that the installed rates are
+  placeholders, not government-verified. **R-040 stays OPEN.**
+- **Tests:** +48 unit net and +7 real-API integration tests (see report). Mutation checks (password in draft, restored password,
+  GSTIN rule removed, auto-login after setup, password shown on review, Start Over without confirmation, preview contacting the
+  server) each failed at least one test; the submit-lock mutation is equivalent because the Complete button is disabled while
+  submitting (the lock is belt and braces). Sources restored and verified identical.
+- **Existing tests changed:** the placeholder "Setup required" page is replaced by the wizard, so the Electron smoke test, the Task 1.7
+  real-API test and one shell test now expect the wizard heading ("CommerceBill setup"). A timer test is given a 5-second
+  async timeout because it failed once under whole-suite load (it passes alone, three times).
 
 ## Task 1.7 results (application shell + login UI; see docs/PHASE_1_TASK_1_7_COMPLETION_REPORT.md, ADR-0018)
 
@@ -277,11 +311,34 @@ dashboards, template designer).
 
 ## Exact next task
 
-**Phase 1, Task 1.8 - Setup wizard UI** (see "Approved Phase 1 roadmap"). Proposed scope, not started; do not begin
-without approval: replace the "Setup required" placeholder with the real wizard on the existing Task 1.4/1.5 setup API
-(draft resume via `GET/PUT /setup/draft`, atomic `POST /setup/complete`, numbering and tax fields, value-free server
-problems mapped to field messages), then return to the sign-in page with a success notice (the API returns no session).
-Acceptance: a fresh database opens the wizard; a half-filled wizard resumes after closing the app; completing it creates
-the organization and administrator atomically and the new administrator can sign in; validation errors are shown per
-field without server text; no password is stored in the draft or the browser; component tests plus a DOM test against
-the real API and a real Electron start on an empty database; all gates green with thresholds unchanged.
+**Phase 1, Task 1.9 - Customer master vertical slice** (see "Approved Phase 1 roadmap"). Proposed scope and acceptance criteria;
+not started - do not begin without approval.
+
+Scope (database -> service -> API -> authentication -> permission -> organization scope -> validation -> audit -> UI -> tests):
+
+1. **Database:** `customers` table (and a table for shipping addresses) per spec section 12, limited to what the first billing
+   workflow needs: id, organization, customer code (unique per organization, generated or entered), type (individual/business),
+   legal name, display name, contact person, email, primary and alternate phone, billing address (lines, city, state code, PIN,
+   country), GST status, GSTIN, PAN, place-of-supply state, payment terms (days), credit limit (decimal), notes, active flag,
+   created/updated timestamps and `version`. Opening balance, price list, tags, tax-exemption status, marketplace reference
+   and attachments are explicitly deferred (record in the matrix). Migration + migration test; forward-only.
+2. **Rules:** GSTIN format and checksum and state/PAN consistency (reuse the setup validators); a registered business customer
+   needs a GSTIN; unregistered must not have one; duplicate checks on code, GSTIN and normalised name within the organization
+   (hard error for duplicate code/GSTIN, warning for similar name); optimistic concurrency with `version`; soft deactivate only
+   (customers are never deleted once referenced).
+3. **API (all behind the launch secret and `requireAuthenticatedUser` + `requirePermission`):** `GET /customers` (search,
+   filter by active/GST status, sort, pagination limit <= 100), `GET /customers/:id`, `POST /customers`, `PUT /customers/:id`
+   (with `expectedVersion`), `POST /customers/:id/deactivate` and `/activate`. Read = `customer.read`, write/deactivate =
+   `customer.write`. Organization taken from the session; other-organization ids are 404; value-free validation problems.
+4. **Audit:** `customer.create`, `customer.update` (changed field names only, never PAN/GSTIN/phone values in clear in logs),
+   `customer.deactivate`, `customer.activate`.
+5. **UI (real API, no mock data):** the Customers sidebar entry becomes available for users with `customer.read`; list with
+   search, filters, sorting, paging, empty state; create/edit form with inline and server validation and a duplicate-warning
+   step; detail view; deactivate/activate with confirmation; read-only presentation for users without `customer.write`.
+6. **Acceptance tests:** 401 without a session and 403 per role template lacking the key, success for permitted roles;
+   organization isolation (Org A cannot list/read/change Org B customers); GSTIN rules including checksum and state/PAN
+   mismatch; duplicate code/GSTIN refused; concurrent edit conflict via `version`; audit rows exist and hold no personal data
+   values; UI tests for list/search/create/edit/deactivate against the real API and a real PostgreSQL database; migration test;
+   all existing gates green, thresholds unchanged.
+7. **Out of scope:** customer statements, balances/ageing, credit-note balance, import/export, merge, attachments, price lists,
+   marketplace references, multiple shipping addresses beyond one optional shipping address (decide in the task design).

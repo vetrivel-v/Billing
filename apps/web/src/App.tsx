@@ -5,14 +5,8 @@ import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
 import { LoginPage } from './LoginPage.js';
 import { MODULES, visibleModules } from './nav.js';
-import {
-  BootingPage,
-  DashboardPage,
-  ModulePage,
-  NotFoundPage,
-  SetupRequiredPage,
-  UnreachablePage,
-} from './pages.js';
+import { SetupWizard } from './setup/SetupWizard.js';
+import { BootingPage, DashboardPage, ModulePage, NotFoundPage, UnreachablePage } from './pages.js';
 
 function Shell() {
   const { state, can, signOut } = useAuth();
@@ -63,7 +57,7 @@ function Shell() {
 
 /** Chooses what the user can see from the launch check and the session state. Nothing else is reachable. */
 export function App() {
-  const { state } = useAuth();
+  const { state, retryBoot, setupCompleted } = useAuth();
   const navigate = useNavigate();
   const wasSignedIn = useRef(false);
   useEffect(() => {
@@ -81,9 +75,11 @@ export function App() {
     case 'unreachable':
       return <UnreachablePage />;
     case 'setup-required':
-      return <SetupRequiredPage />;
+      return (
+        <SetupWizard onCompleted={setupCompleted} onAlreadyCompleted={() => void retryBoot()} />
+      );
     case 'signed-out':
-      return <LoginPage notice={state.notice} />;
+      return <LoginPage notice={state.notice} initialUsername={state.username} />;
     case 'signed-in':
       return state.me.mustChangePassword ? <ForcedChangePasswordPage /> : <Shell />;
   }

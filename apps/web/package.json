@@ -9,6 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@commercebill/numbering": "^0.0.1",
+    "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",
     "@commercebill/ui": "^0.0.1",
     "@tanstack/react-query": "^5.104.3",

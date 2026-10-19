@@ -303,7 +303,7 @@ describe('sign-out and revocation against the real API', () => {
 });
 
 describe('launch check against the real API', () => {
-  it('shows "Setup required" for a database with no completed setup (no sign-in offered)', async () => {
+  it('shows the setup wizard for a database with no completed setup (no sign-in offered)', async () => {
     const empty = await createFixture(inject('pgAdminUrl'), { bare: true });
     const emptyApp = await empty.makeApp();
     try {
@@ -316,7 +316,7 @@ describe('launch check against the real API', () => {
         getApiAccess: async () => ({ baseUrl: url, secret: LAUNCH_SECRET }),
       };
       renderApp();
-      expect(await screen.findByRole('heading', { name: 'Setup required' })).toBeTruthy();
+      expect(await screen.findByRole('heading', { name: 'CommerceBill setup' })).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
     } finally {
       cleanup();

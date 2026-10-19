@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GST_STATUSES } from './validators.js';
 
 /**
  * Structural shapes for the setup wizard. Unknown keys are REJECTED (strict objects): that is the main
@@ -7,7 +8,7 @@ import { z } from 'zod';
 
 const text = (max: number) => z.string().max(max);
 
-export const GST_STATUSES = ['REGISTERED', 'UNREGISTERED', 'COMPOSITION'] as const;
+export { GST_STATUSES };
 
 const businessShape = {
   legalName: text(200),

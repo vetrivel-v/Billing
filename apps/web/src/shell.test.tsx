@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App.js';
@@ -57,6 +66,9 @@ function submitPasswordChange(current: string, next: string, confirm: string, la
   fireEvent.click(screen.getAllByRole('button', { name: label }).at(-1)!);
 }
 
+// Under a loaded machine (the whole suite runs in parallel) async UI updates can take longer than the 1s default.
+configure({ asyncUtilTimeout: 5000 });
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -74,16 +86,18 @@ describe('launch check', () => {
     expect(screen.queryByText('System status')).toBeNull(); // the Phase 0 status page is gone
   });
 
-  it('tells the user honestly when setup is required (the wizard is a later task)', async () => {
+  it('opens the setup wizard when setup is required (no sign-in is offered)', async () => {
     installFakeApi({
       ...base,
+      'GET /setup/draft': () => ({ status: 200, body: { draft: null, discarded: false } }),
       'GET /setup/status': () => ({
         status: 200,
         body: { setupRequired: true, draftAvailable: false },
       }),
     });
     renderApp();
-    expect(await screen.findByRole('heading', { name: 'Setup required' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'CommerceBill setup' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start Setup' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
   });
 

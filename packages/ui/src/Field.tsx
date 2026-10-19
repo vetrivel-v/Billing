@@ -3,6 +3,8 @@ import { cx } from './classes.js';
 
 interface FieldProps extends Omit<ComponentPropsWithRef<'input'>, 'id'> {
   label: string;
+  /** Shows "(required)" or "(optional)" after the label, inside it, so it is also in the accessible name. */
+  requirement?: 'required' | 'optional';
   hint?: string;
   /** Shown under the input and linked with aria-describedby / aria-invalid. */
   error?: string | undefined;
@@ -30,15 +32,20 @@ function Messages({ id, hint, error }: { id: string; hint?: string; error?: stri
   );
 }
 
+export function Requirement({ value }: { value?: 'required' | 'optional' | undefined }) {
+  return value ? <span className="font-normal text-slate-500"> ({value})</span> : null;
+}
+
 const describe = (id: string, hint?: string, error?: string) =>
   [error ? `${id}-error` : null, hint ? `${id}-hint` : null].filter(Boolean).join(' ') || undefined;
 
-export function TextInput({ label, hint, error, className, ...rest }: FieldProps) {
+export function TextInput({ label, requirement, hint, error, className, ...rest }: FieldProps) {
   const id = useId();
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="block text-sm font-medium text-slate-700">
         {label}
+        <Requirement value={requirement} />
       </label>
       <input
         {...rest}
@@ -53,13 +60,14 @@ export function TextInput({ label, hint, error, className, ...rest }: FieldProps
 }
 
 /** Password field with a show/hide toggle. The value is never stored or logged by this component. */
-export function PasswordInput({ label, hint, error, className, ...rest }: FieldProps) {
+export function PasswordInput({ label, requirement, hint, error, className, ...rest }: FieldProps) {
   const id = useId();
   const [visible, setVisible] = useState(false);
   return (
     <div className="space-y-1">
       <label htmlFor={id} className="block text-sm font-medium text-slate-700">
         {label}
+        <Requirement value={requirement} />
       </label>
       <div className="relative">
         <input

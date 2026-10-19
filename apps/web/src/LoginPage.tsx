@@ -10,15 +10,25 @@ const LOCKOUT_AFTER_FAILURES = 5;
 const NOTICES: Record<SignedOutNotice, { tone: 'info' | 'warning'; text: string }> = {
   'signed-out': { tone: 'info', text: 'You have been signed out.' },
   expired: { tone: 'warning', text: 'Your session expired. Sign in again to continue.' },
+  'setup-complete': {
+    tone: 'info',
+    text: 'Setup is complete. Sign in with the administrator account you just created.',
+  },
   ended: {
     tone: 'warning',
     text: 'Your session has ended. It may have been signed out elsewhere or revoked by an administrator. Sign in again to continue.',
   },
 };
 
-export function LoginPage({ notice }: { notice?: SignedOutNotice | undefined }) {
+export function LoginPage({
+  notice,
+  initialUsername = '',
+}: {
+  notice?: SignedOutNotice | undefined;
+  initialUsername?: string | undefined;
+}) {
   const { signIn } = useAuth();
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +41,10 @@ export function LoginPage({ notice }: { notice?: SignedOutNotice | undefined }) 
   useEffect(() => {
     if (!busy && error) passwordRef.current?.focus();
   }, [busy, error]);
+  // Right after setup the username is already filled in: start in the password field.
+  useEffect(() => {
+    if (initialUsername) passwordRef.current?.focus();
+  }, [initialUsername]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -75,7 +89,7 @@ export function LoginPage({ notice }: { notice?: SignedOutNotice | undefined }) 
             label="Username"
             name="username"
             autoComplete="username"
-            autoFocus
+            autoFocus={!initialUsername}
             autoCapitalize="none"
             spellCheck={false}
             value={username}

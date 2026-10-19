@@ -36,22 +36,6 @@ export function UnreachablePage() {
   );
 }
 
-/** The setup wizard screens arrive in the next task; until then this is an honest placeholder, not a fake form. */
-export function SetupRequiredPage() {
-  const { retryBoot } = useAuth();
-  return (
-    <CenteredPanel title="Setup required">
-      <p className="text-sm text-slate-600">
-        This installation has not been set up yet. The setup wizard is not available in this version
-        of the application.
-      </p>
-      <Button variant="secondary" onClick={() => void retryBoot()}>
-        Check again
-      </Button>
-    </CenteredPanel>
-  );
-}
-
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>

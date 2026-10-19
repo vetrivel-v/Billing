@@ -5,6 +5,7 @@ import type {
   HealthResponse,
   LoginResponse,
   MeResponse,
+  SetupCompleteResponse,
   SetupStatusResponse,
 } from '@commercebill/shared-types';
 
@@ -103,7 +104,7 @@ interface CallOptions {
  * when the service cannot be reached.
  */
 async function callApi<T>(
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   path: string,
   opts: CallOptions = {},
 ): Promise<T> {
@@ -151,3 +152,21 @@ export const changePassword = (
   newPassword: string,
 ): Promise<void> =>
   callApi('POST', '/auth/change-password', { token, body: { currentPassword, newPassword } });
+
+/** The saved first-run draft: non-secret fields only (the server rejects any password field). */
+export interface SetupDraftResponse {
+  draft: { data: Record<string, Record<string, unknown>>; version: number; savedAt: string } | null;
+  discarded: boolean;
+}
+
+export const getSetupDraft = (): Promise<SetupDraftResponse> => callApi('GET', '/setup/draft');
+
+export const saveSetupDraft = (
+  data: unknown,
+  expectedVersion: number,
+): Promise<{ version: number; savedAt: string }> =>
+  callApi('PUT', '/setup/draft', { body: { data, expectedVersion } });
+
+/** Atomic first-run completion. Creates NO session: the administrator signs in afterwards. */
+export const completeSetup = (body: unknown): Promise<SetupCompleteResponse> =>
+  callApi('POST', '/setup/complete', { body });

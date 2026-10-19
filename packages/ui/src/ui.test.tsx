@@ -11,7 +11,10 @@ import {
   LoadingState,
   PageHeader,
   PasswordInput,
+  RadioGroup,
+  SelectField,
   Sidebar,
+  Steps,
   TextInput,
   cx,
 } from './index.js';
@@ -166,5 +169,85 @@ describe('Sidebar and AppShell', () => {
     const main = screen.getByRole('main');
     fireEvent.click(screen.getByText('Skip to main content'));
     expect(document.activeElement).toBe(main);
+  });
+});
+
+describe('requirement indicator', () => {
+  it('is part of the accessible label of inputs, passwords and selects', () => {
+    render(
+      <>
+        <TextInput label="Name" requirement="required" />
+        <PasswordInput label="Secret" requirement="optional" />
+        <SelectField label="State" requirement="required">
+          <option value="">Choose</option>
+        </SelectField>
+      </>,
+    );
+    expect(screen.getByLabelText('Name (required)')).toBeTruthy();
+    expect(screen.getByLabelText('Secret (optional)')).toBeTruthy();
+    expect(screen.getByLabelText('State (required)')).toBeTruthy();
+  });
+});
+
+describe('SelectField', () => {
+  it('links hint and error and reports changes', () => {
+    const onChange = vi.fn();
+    render(
+      <SelectField label="State" hint="Pick one" error="Required" onChange={onChange}>
+        <option value="">Choose</option>
+        <option value="27">Maharashtra</option>
+      </SelectField>,
+    );
+    const select = screen.getByLabelText('State');
+    expect(select.getAttribute('aria-invalid')).toBe('true');
+    expect(select.getAttribute('aria-describedby')).toContain('-error');
+    fireEvent.change(select, { target: { value: '27' } });
+    expect(onChange).toHaveBeenCalled();
+  });
+});
+
+describe('RadioGroup', () => {
+  it('groups native radios under a legend and reports the choice', () => {
+    const onChange = vi.fn();
+    render(
+      <RadioGroup
+        legend="Status"
+        name="s"
+        value="a"
+        onChange={onChange}
+        error="Pick one"
+        options={[
+          { value: 'a', label: 'Alpha', description: 'First' },
+          { value: 'b', label: 'Beta' },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'Status' })).toBeTruthy();
+    expect((screen.getByRole('radio', { name: /Alpha/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('radio', { name: /Beta/ }));
+    expect(onChange).toHaveBeenCalledWith('b');
+    expect(screen.getByText('Pick one')).toBeTruthy();
+  });
+});
+
+describe('Steps', () => {
+  it('marks completed, current and upcoming steps for sighted and assistive users', () => {
+    render(
+      <Steps
+        label="Setup progress"
+        current={1}
+        steps={[
+          { key: 'a', label: 'One' },
+          { key: 'b', label: 'Two' },
+          { key: 'c', label: 'Three' },
+        ]}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]!.textContent).toContain('(completed)');
+    expect(items[1]!.getAttribute('aria-current')).toBe('step');
+    expect(items[1]!.textContent).toContain('(current step)');
+    expect(items[2]!.getAttribute('aria-current')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Setup progress' })).toBeTruthy();
   });
 });

@@ -13,19 +13,21 @@ import * as api from './api.js';
 import { ApiError } from './api.js';
 
 /** Why the user is looking at the sign-in page without having just opened the app. */
-export type SignedOutNotice = 'signed-out' | 'expired' | 'ended';
+export type SignedOutNotice = 'signed-out' | 'expired' | 'ended' | 'setup-complete';
 
 export type AuthState =
   | { phase: 'booting' }
   | { phase: 'unreachable' }
-  | { phase: 'setup-required' }
-  | { phase: 'signed-out'; notice?: SignedOutNotice }
+  | { phase: 'setup-required'; draftAvailable: boolean }
+  | { phase: 'signed-out'; notice?: SignedOutNotice; username?: string }
   | { phase: 'signed-in'; me: MeResponse };
 
 export interface AuthApi {
   state: AuthState;
   /** Re-run the launch check (used by the "Try again" button). */
   retryBoot(): Promise<void>;
+  /** First-run setup finished: show sign-in (NO session is created) with the new administrator's username. */
+  setupCompleted(username: string): void;
   /** Throws ApiError / ApiUnreachableError on failure; the caller decides the wording. */
   signIn(username: string, password: string): Promise<void>;
   signOut(): Promise<void>;
@@ -68,7 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ phase: 'booting' });
     try {
       const status = await api.getSetupStatus();
-      setState(status.setupRequired ? { phase: 'setup-required' } : { phase: 'signed-out' });
+      setState(
+        status.setupRequired
+          ? { phase: 'setup-required', draftAvailable: status.draftAvailable }
+          : { phase: 'signed-out' },
+      );
     } catch {
       setState({ phase: 'unreachable' });
     }
@@ -116,6 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [adopt],
   );
+
+  const setupCompleted = useCallback((username: string) => {
+    tokenRef.current = null;
+    setState({ phase: 'signed-out', notice: 'setup-complete', username });
+  }, []);
 
   const signOut = useCallback(async () => {
     const token = tokenRef.current;
@@ -165,12 +176,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       retryBoot: boot,
+      setupCompleted,
       signIn,
       signOut,
       changePassword,
       can: (permission) => permissions?.includes(permission) ?? false,
     }),
-    [state, boot, signIn, signOut, changePassword, permissions],
+    [state, boot, setupCompleted, signIn, signOut, changePassword, permissions],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

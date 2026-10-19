@@ -109,9 +109,9 @@ describe('Electron shell supplies the launch secret to the API (P1-SEC-01)', () 
     expect(result.livenessWithoutSecret.status).toBe(200);
 
     // The React app itself reached the API using the shell-supplied secret: its first screen is chosen from a
-    // launch-secret-protected call (/setup/status). This database has no organization, so the app shows "Setup required";
+    // launch-secret-protected call (/setup/status). This database has no organization, so the app shows the setup wizard ("CommerceBill setup");
     // without a working secret it would show "CommerceBill is not ready" instead.
-    expect(result.ui).toEqual({ screen: 'Setup required' });
+    expect(result.ui).toEqual({ screen: 'CommerceBill setup' });
 
     // The API's captured output never contains the secret.
     expect(result.secretInApiOutput).toBe(false);

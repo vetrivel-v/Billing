@@ -52,6 +52,7 @@ reviewed in the diff.
 - [x] Sign-in UI (Task 1.7): one generic failure for every cause, no username oracle (lockout hint identical for unknown and known names), no technical text, password field cleared after each attempt
 - [x] Session token memory-only in the renderer (never storage, URL, DOM or logs) and separate from the launch secret; sign-out revokes the session; idle/absolute expiry and 401 handling; in-flight responses cannot resurrect an ended session
 - [x] Navigation derived from permissions, never role names (the server still enforces every route)
+- [x] Setup wizard (Task 1.8): the administrator password is memory-only (never in the draft, storage, URL, logs, audit, review page or DOM outside active inputs), a rejected password is dropped, completion creates no session, a completed installation cannot reopen the wizard or bootstrap endpoints, no bank/UPI/credential fields are collected
 - [ ] Automated accessibility audit (planned, R-069)
 - [ ] Path traversal / upload restrictions (Phase 1+)
 - [x] Per-launch secret guard on API, wired into the shell and verified end to end (Tasks 1.0 and 1.2)
