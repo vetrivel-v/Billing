@@ -9,6 +9,8 @@ import { InventoryPage } from './inventory/InventoryPage.js';
 import { InventoryProductPage } from './inventory/InventoryProductPage.js';
 import { StockOperationPage } from './inventory/StockOperationPage.js';
 import { LoginPage } from './LoginPage.js';
+import { HsnSacPage } from './tax/HsnSacPage.js';
+import { TaxConfigurationPage } from './tax/TaxConfigurationPage.js';
 import { ProductFormPage } from './products/ProductFormPage.js';
 import { ProductsPage } from './products/ProductsPage.js';
 import { MODULES, visibleModules } from './nav.js';
@@ -132,12 +134,29 @@ function Shell() {
             </Guarded>
           }
         />
+        <Route
+          path="/tax"
+          element={
+            <Guarded module="tax">
+              <TaxConfigurationPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/tax/hsn-sac"
+          element={
+            <Guarded module="tax">
+              <HsnSacPage />
+            </Guarded>
+          }
+        />
         {MODULES.filter(
           (m) =>
             m.key !== 'dashboard' &&
             m.key !== 'customers' &&
             m.key !== 'products' &&
-            m.key !== 'inventory',
+            m.key !== 'inventory' &&
+            m.key !== 'tax',
         ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />
         ))}

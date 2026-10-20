@@ -419,9 +419,7 @@ describe('new product form', () => {
     await openForm({
       'GET /products/references': () => ({ status: 200, body: references({ hsnSacTotal: 0 }) }),
     });
-    expect(
-      await screen.findByText(/HSN\/SAC reference list is empty in this installation/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/Your HSN\/SAC list is empty/)).toBeTruthy();
     expect(section('Classification').queryByLabelText(/HSN code/)).toBeNull();
     cleanup();
 

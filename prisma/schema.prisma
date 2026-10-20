@@ -60,6 +60,8 @@ model Organization {
   productCodeCounter        ProductCodeCounter?
   stockMovements            StockMovement[]
   stockBalances             StockBalance[]
+  hsnSacCodes               HsnSacCode[]
+  taxConfigurationReviews   TaxConfigurationReview[]
   users                     User[]
   roles                     Role[]
   documentSequences         DocumentSequence[]
@@ -181,11 +183,13 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version            Int       @default(1)
 
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   roles          UserRole[]
   sessions       Session[]
   auditLogs      AuditLog[]
   stockMovements StockMovement[]
+  hsnSacReviews  HsnSacCode[]             @relation("HsnSacReviewer")
+  taxReviews     TaxConfigurationReview[] @relation("TaxReviewer")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -386,18 +390,59 @@ model TaxRate {
   @@map("tax_rates")
 }
 
-/// Global HSN/SAC reference catalogue. Descriptions are user-maintained; no official data is bundled.
+/// Organization-scoped HSN/SAC list, maintained by the user (Task 1.12, ADR-0023). No official data is bundled or invented:
+/// every row is entered by a person (origin USER; IMPORT is reserved for a later reviewed import) and starts UNREVIEWED.
+/// `code` and `kind` never change after creation; rows are never deleted (made inactive).
 model HsnSacCode {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String   @unique @db.VarChar(8)
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  code           String    @db.VarChar(8)
   /// "HSN" (goods) or "SAC" (services).
-  kind        String   @db.VarChar(3)
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  kind           String    @db.VarChar(3)
+  description    String?
+  isActive       Boolean   @default(true) @map("is_active")
+  origin         String    @default("USER")
+  reviewStatus   String    @default("UNREVIEWED") @map("review_status")
+  reviewedBy     String?   @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version        Int       @default(1)
 
-  products Product[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reviewer     User?        @relation("HsnSacReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict)
+  products     Product[]
 
+  @@unique([organizationId, code])
+  @@index([organizationId, kind])
   @@map("hsn_sac_codes")
+}
+
+/// One confirmation of the tax configuration by a person (Task 1.12, ADR-0023). Append-only (triggers refuse UPDATE,
+/// DELETE and TRUNCATE). It is a business/professional confirmation recorded by CommerceBill, NOT government verification or
+/// legal certification. A review applies to exactly one configuration fingerprint; when the fingerprint changes the latest
+/// review is stale.
+model TaxConfigurationReview {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId             String   @map("organization_id") @db.Uuid
+  fingerprint                String
+  reviewedBy                 String   @map("reviewed_by") @db.Uuid
+  /// The reviewer's own statement of the capacity in which they confirm (free text).
+  reviewerCapacity           String   @map("reviewer_capacity")
+  reviewedAt                 DateTime @default(now()) @map("reviewed_at") @db.Timestamptz(6)
+  noticeVersion              String   @map("notice_version")
+  noticeText                 String   @map("notice_text")
+  note                       String?
+  engineVersion              String   @map("engine_version")
+  rulesetVersion             String   @map("ruleset_version")
+  jurisdictionRulesetVersion String   @map("jurisdiction_ruleset_version")
+  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reviewer     User         @relation("TaxReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("tax_configuration_reviews")
 }
 
 model Unit {
@@ -431,8 +476,9 @@ model Customer {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId         String                @map("organization_id") @db.Uuid
   code                   String
-  /// B2C or B2B (CHECK constraint; widened by a later migration when marketplace types arrive).
-  customerType           String                @map("customer_type")
+  /// BUSINESS or INDIVIDUAL: what kind of party this is. It is independent of GST registration (ADR-0023): the invoice
+  /// derives B2B/B2C per document from the recipient GST facts.
+  customerKind           String                @map("customer_kind")
   legalName              String                @map("legal_name")
   displayName            String?               @map("display_name")
   contactPerson          String?               @map("contact_person")

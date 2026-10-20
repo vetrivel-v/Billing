@@ -185,6 +185,20 @@ cleared or changed). Existing violating rows make the migration abort atomically
 - New trigger `products_protect_stock_history` on `products`: a product with stock movements keeps its `unit_id` and cannot stop tracking inventory.
 - No cost, price, value or valuation column anywhere. Existing tables and rows are untouched (tested against a populated Task 1.10 database).
 
+### 3.9 Changes in migration `20261025000000_task_1_12_tax_configuration` (Task 1.12)
+
+- `customers`: the column `customer_type` (B2C/B2B) is renamed `customer_kind` with values INDIVIDUAL/BUSINESS (a label rename only; GST facts are not touched). The check "a B2C customer is unregistered" is dropped
+  (the kind is independent of GST registration) and `customers_gstin_by_status` now requires a GSTIN for REGISTERED and COMPOSITION customers and forbids one for UNREGISTERED. The migration stops, changing nothing, if existing rows violate that.
+- `hsn_sac_codes` becomes organization-scoped and user-maintained: new `organization_id` (required), `is_active`, `origin` (USER | IMPORT), `review_status` (UNREVIEWED | REVIEWED) with `reviewed_by`/`reviewed_at`,
+  `updated_at`, `version`; unique `(organization_id, code)` replaces the global unique code; code format 2-8 digits. Triggers: no delete, code/kind/organization/origin immutable, editing drops a review mark, the reviewer must belong to the organization.
+  `check_product_references` now also requires a product's HSN/SAC entry to belong to the product's organization.
+- `tax_rates`: trigger `tax_rates_check_window` forbids overlapping effective windows within a category (advisory-locked; an end date before the start is left to the existing CHECK; a row with an existing `(category, start)` key is left to the unique index so the idempotent seed still works);
+  trigger `tax_rates_protect` makes a rate immutable and undeletable (the only edit is closing an open rate once; review marks may change).
+- `tax_categories`: trigger `tax_categories_protect` keeps code, classification, organization and origin, forbids delete, and drops the row review mark when name, active flag or effective dates change.
+- New table `tax_configuration_reviews` (append-only; UPDATE/DELETE/TRUNCATE refused): organization, `fingerprint` (64 hex), `reviewed_by` (same organization), `reviewer_capacity`, `reviewed_at`, `notice_version`, `notice_text`, `note`, `engine_version`,
+  `ruleset_version`, `jurisdiction_ruleset_version`, `created_at`. Index `(organization_id, created_at desc)`.
+- No schema for billing mode, HSN/SAC policy or the review gate state: they use `organization_settings` keys (`billing_mode`, `hsn_sac_requirement`); the gate is computed.
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

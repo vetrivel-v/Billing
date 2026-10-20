@@ -11,7 +11,7 @@ export {
 export {
   CODE_PATTERN,
   CUSTOMER_FIELDS,
-  CUSTOMER_TYPES,
+  CUSTOMER_KINDS,
   GST_STATUSES,
   validateCustomer,
   type CustomerField,

@@ -7,7 +7,7 @@ const gstin = (state: string, pan: string) => {
   return `${f}${gstinCheckCharacter(f)}`;
 };
 const base = {
-  customerType: 'B2B',
+  customerKind: 'BUSINESS',
   legalName: '  Fictional Buyer  ',
   gstStatus: 'REGISTERED',
   pan: 'abcde1234f',
@@ -79,7 +79,7 @@ describe('validateCustomer normalisation', () => {
 describe('validateCustomer problems', () => {
   it('reports value-free problems for each bad field', () => {
     const all = rules({
-      customerType: 'B3B',
+      customerKind: 'B3B',
       legalName: '',
       gstStatus: 'MAYBE',
       billingAddressLine1: '',
@@ -94,7 +94,7 @@ describe('validateCustomer problems', () => {
     });
     expect(all).toEqual(
       expect.arrayContaining([
-        'customerType:invalid_value',
+        'customerKind:invalid_value',
         'legalName:required',
         'gstStatus:invalid_value',
         'billingAddressLine1:required',
@@ -115,10 +115,25 @@ describe('validateCustomer problems', () => {
     expect(rules({ ...base, gstin: 'X' })).toEqual(['gstin:invalid_gstin_format']);
     expect(rules({ ...base, billingStateCode: '29' })).toEqual(['gstin:gstin_state_mismatch']);
     expect(rules({ ...base, pan: 'ZZZZZ9999Z' })).toEqual(['gstin:gstin_pan_mismatch']);
-    expect(rules({ ...base, gstStatus: 'COMPOSITION', gstin: undefined, pan: undefined })).toEqual(
-      [],
-    );
-    expect(rules({ ...base, customerType: 'B2C' })).toEqual(['gstStatus:b2c_must_be_unregistered']);
+    // A composition customer is registered too: a GSTIN is required (it was optional before Task 1.12).
+    expect(rules({ ...base, gstStatus: 'COMPOSITION', gstin: undefined, pan: undefined })).toEqual([
+      'gstin:gstin_required',
+    ]);
+    expect(rules({ ...base, gstStatus: 'COMPOSITION' })).toEqual([]);
+    expect(rules({ ...base, gstStatus: 'UNREGISTERED', gstin: base.gstin })).toEqual([
+      'gstin:gstin_not_allowed',
+    ]);
+    // The customer kind says nothing about GST registration: an individual may be registered, a business may not.
+    expect(rules({ ...base, customerKind: 'INDIVIDUAL' })).toEqual([]);
+    expect(
+      rules({
+        ...base,
+        customerKind: 'BUSINESS',
+        gstStatus: 'UNREGISTERED',
+        gstin: undefined,
+        pan: undefined,
+      }),
+    ).toEqual([]);
   });
 
   it('rejects unknown fields, wrong types, over-long text and (on update) a code', () => {

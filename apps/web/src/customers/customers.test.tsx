@@ -91,7 +91,7 @@ describe('customer list', () => {
         code: 'CUS-000001',
         legalName: 'Acme Traders',
         displayName: 'Acme',
-        customerType: 'B2B',
+        customerKind: 'BUSINESS',
         gstStatus: 'REGISTERED',
         gstin: '27ABCDE1234F1Z0',
         phone: '9000000001',
@@ -106,7 +106,7 @@ describe('customer list', () => {
     for (const expected of [
       'CUS-000001',
       'Acme Traders',
-      'B2B',
+      'Business',
       'Registered',
       '27ABCDE1234F1Z0',
       'Maharashtra',
@@ -177,8 +177,8 @@ describe('customer list', () => {
     );
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'all' } });
     await waitFor(() => expect(customerCalls(calls).at(-1)!.query).not.toContain('isActive'));
-    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'B2C' } });
-    await waitFor(() => expect(customerCalls(calls).at(-1)!.query).toContain('type=B2C'));
+    fireEvent.change(screen.getByLabelText('Kind'), { target: { value: 'INDIVIDUAL' } });
+    await waitFor(() => expect(customerCalls(calls).at(-1)!.query).toContain('kind=INDIVIDUAL'));
   });
 
   it('pages through results with Previous and Next using server offsets', async () => {
@@ -247,7 +247,7 @@ describe('new customer form', () => {
     return calls;
   }
 
-  it('is grouped into sections and defaults to B2B / unregistered with no GSTIN field', async () => {
+  it('is grouped into sections and defaults to a business / unregistered with no GSTIN field', async () => {
     await openForm();
     for (const title of [
       'Basic details',
@@ -259,7 +259,9 @@ describe('new customer form', () => {
     ]) {
       expect(screen.getByRole('region', { name: title })).toBeTruthy();
     }
-    expect((screen.getByRole('radio', { name: /^B2B/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('radio', { name: /^Business/ }) as HTMLInputElement).checked).toBe(
+      true,
+    );
     expect(section('Tax details').queryByLabelText(/^GSTIN/)).toBeNull();
     await waitFor(() =>
       expect(document.activeElement).toBe(labelled(section('Basic details'), 'Customer name')),
@@ -267,18 +269,20 @@ describe('new customer form', () => {
     expect(section('Basic details').getByText(/Leave blank to generate/)).toBeTruthy();
   });
 
-  it('GST fields are conditional: registered needs a GSTIN, composition may have one, B2C hides them all', async () => {
+  it('GST fields follow the GST registration only: registered and composition need a GSTIN, the customer kind does not matter', async () => {
     await openForm();
     const tax = section('Tax details');
     fireEvent.change(labelled(tax, 'GST registration'), { target: { value: 'REGISTERED' } });
     expect(screen.getByLabelText('GSTIN (required)')).toBeTruthy();
     fireEvent.change(labelled(tax, 'GST registration'), { target: { value: 'COMPOSITION' } });
-    expect(screen.getByLabelText('GSTIN (optional)')).toBeTruthy();
+    expect(screen.getByLabelText('GSTIN (required)')).toBeTruthy();
     fireEvent.change(labelled(tax, 'GST registration'), { target: { value: 'UNREGISTERED' } });
     expect(tax.queryByLabelText(/^GSTIN/)).toBeNull();
-    fireEvent.click(screen.getByRole('radio', { name: /^B2C/ }));
-    expect(tax.queryByLabelText(/^GST registration/)).toBeNull();
-    expect(tax.getByText(/Consumers \(B2C\) are not GST registered/)).toBeTruthy();
+    // choosing the kind never hides or forces the GST fields
+    fireEvent.click(screen.getByRole('radio', { name: /^Individual/ }));
+    expect(tax.getByLabelText(/^GST registration/)).toBeTruthy();
+    fireEvent.change(labelled(tax, 'GST registration'), { target: { value: 'REGISTERED' } });
+    expect(screen.getByLabelText('GSTIN (required)')).toBeTruthy();
   });
 
   it('validates before sending: required fields, GSTIN rules and state consistency', async () => {
@@ -338,7 +342,7 @@ describe('new customer form', () => {
     expect(await screen.findByText('Customer CUS-000042 (Acme Traders) was created.')).toBeTruthy();
     expect(customerCalls(calls, 'POST')).toHaveLength(1);
     expect(sent).toMatchObject({
-      customerType: 'B2B',
+      customerKind: 'BUSINESS',
       legalName: 'Acme Traders',
       displayName: 'Acme',
       gstStatus: 'REGISTERED',
@@ -359,7 +363,7 @@ describe('new customer form', () => {
     expect(await screen.findByRole('table')).toBeTruthy();
   });
 
-  it('a B2C customer is always sent as unregistered, without a GSTIN', async () => {
+  it('an individual who is not registered is sent as unregistered, without a GSTIN', async () => {
     let sent: Record<string, unknown> = {};
     await open('/customers/new', WRITE, {
       'POST /customers': (req) => {
@@ -369,13 +373,17 @@ describe('new customer form', () => {
       'GET /customers': listOf(),
     });
     await screen.findByRole('heading', { name: 'New customer' });
-    fireEvent.click(screen.getByRole('radio', { name: /^B2C/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /^Individual/ }));
     typeIn(section('Basic details'), 'Customer name', 'Walk-in Person');
     typeIn(section('Billing address'), 'Address line 1', '3 Lane');
     typeIn(section('Billing address'), 'State / union territory', '27');
     fireEvent.click(screen.getByRole('button', { name: 'Create customer' }));
     await screen.findByRole('table');
-    expect(sent).toMatchObject({ customerType: 'B2C', gstStatus: 'UNREGISTERED', gstin: null });
+    expect(sent).toMatchObject({
+      customerKind: 'INDIVIDUAL',
+      gstStatus: 'UNREGISTERED',
+      gstin: null,
+    });
   });
 
   it('shipping: "same as billing" hides the shipping fields; a different address needs line and state and sets the default place of supply', async () => {
@@ -451,7 +459,7 @@ describe('edit, deactivate and read-only', () => {
     customer({
       code: 'CUS-000007',
       legalName: 'Existing Buyer',
-      customerType: 'B2B',
+      customerKind: 'BUSINESS',
       gstStatus: 'REGISTERED',
       gstin: '27ABCDE1234F1Z0',
       pan: 'ABCDE1234F',

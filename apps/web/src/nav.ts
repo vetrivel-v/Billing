@@ -35,6 +35,13 @@ export const MODULES: readonly NavModule[] = [
     available: true,
   },
   {
+    key: 'tax',
+    label: 'Tax',
+    path: '/tax',
+    permission: 'tax.config.read',
+    available: true,
+  },
+  {
     key: 'billing',
     label: 'Billing',
     path: '/billing',

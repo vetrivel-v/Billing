@@ -15,8 +15,8 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /**
- * Chooses an HSN (goods) or SAC (services) code from the REAL reference list on the server. The browser can only pick an
- * entry the server returned (its id is sent), never type a code of its own. When the reference list is empty the picker says so.
+ * Chooses an HSN (goods) or SAC (services) code from the organization's OWN HSN/SAC list on the server. The browser can only pick an
+ * entry the server returned (its id is sent), never type a code of its own. When that list is empty the picker says so.
  */
 export function HsnSacPicker({
   kind,
@@ -30,7 +30,7 @@ export function HsnSacPicker({
   kind: 'HSN' | 'SAC';
   valueId: string;
   valueLabel: string;
-  /** Number of codes in the whole reference list (0 = not loaded in this installation). */
+  /** Number of codes in the whole reference list (0 = nothing entered yet). */
   total: number;
   disabled: boolean;
   error: string | undefined;
@@ -79,8 +79,8 @@ export function HsnSacPicker({
             className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
             role="status"
           >
-            The HSN/SAC reference list is empty in this installation, so a code cannot be chosen
-            yet. The product can be saved without one and updated later.
+            Your HSN/SAC list is empty, so a code cannot be chosen yet. Add the codes you use under
+            Tax, HSN/SAC codes. The product can be saved without one and updated later.
           </p>
         </div>
       ) : (

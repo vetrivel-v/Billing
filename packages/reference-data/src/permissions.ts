@@ -28,6 +28,7 @@ export const PERMISSIONS: readonly PermissionDef[] = [
   p('org.settings.update', 'admin', 'Change business settings'),
   p('tax.config.read', 'read', 'View tax categories and rates'),
   p('tax.config.update', 'admin', 'Change tax categories and rates'),
+  p('tax.config.review', 'admin', 'Confirm the tax configuration review and switch billing mode'),
   p('sequence.read', 'read', 'View document number sequences'),
   p('sequence.update', 'admin', 'Change document number sequences'),
 

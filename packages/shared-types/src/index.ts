@@ -107,14 +107,14 @@ export interface SetupCompleteResponse {
 
 // ------------------------------------------------------------------------------------------------ customers
 
-export type CustomerType = 'B2C' | 'B2B';
+export type CustomerKind = 'INDIVIDUAL' | 'BUSINESS';
 export type CustomerGstStatus = 'REGISTERED' | 'UNREGISTERED' | 'COMPOSITION';
 
 /** A customer as the API returns it. State names are derived from the reference list; dates are ISO strings. */
 export interface CustomerView {
   id: string;
   code: string;
-  customerType: CustomerType;
+  customerKind: CustomerKind;
   legalName: string;
   displayName: string | null;
   contactPerson: string | null;
@@ -272,4 +272,105 @@ export interface StockOperationResponse {
   movement: StockMovementView;
   onHand: string;
   replayed: boolean;
+}
+
+// -------------------------------------------------------------------------------------------------- tax configuration
+
+export type BillingMode = 'DEMO' | 'PRODUCTION';
+export type TaxReviewState = 'NONE' | 'CURRENT' | 'STALE';
+
+export interface TaxRateView {
+  id: string;
+  /** Exact decimal text. */
+  ratePercent: string;
+  cessPercent: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  origin: string;
+  reviewStatus: 'UNREVIEWED' | 'REVIEWED';
+}
+
+export interface TaxCategoryView {
+  id: string;
+  code: string;
+  name: string;
+  classification: string;
+  isActive: boolean;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  origin: string;
+  reviewStatus: 'UNREVIEWED' | 'REVIEWED';
+  rates: TaxRateView[];
+}
+
+export interface TaxReviewView {
+  id: string;
+  fingerprint: string;
+  reviewedByName: string;
+  reviewerCapacity: string;
+  reviewedAt: string;
+  noticeVersion: string;
+  noticeText: string;
+  note: string | null;
+  engineVersion: string;
+  rulesetVersion: string;
+  jurisdictionRulesetVersion: string;
+}
+
+export interface HsnPolicyView {
+  /** true = every invoice line needs an HSN/SAC code (the default). */
+  required: boolean;
+  reason: string | null;
+  changedAt: string | null;
+}
+
+export interface TaxConfigurationResponse {
+  engine: { engineVersion: string; rulesetVersion: string; roundingPolicyId: string };
+  jurisdictions: {
+    id: string;
+    version: string;
+    reviewStatus: 'UNREVIEWED';
+    entries: { code: string; name: string; kind: string }[];
+  };
+  categories: TaxCategoryView[];
+  fingerprint: string;
+  review: { state: TaxReviewState; latest: TaxReviewView | null };
+  notice: { version: string; text: string };
+  seller: { gstStatus: string; gstin: string | null; stateCode: string | null };
+  hsnPolicy: HsnPolicyView;
+  gate: {
+    mode: BillingMode;
+    eligible: boolean;
+    requirements: { code: string; met: boolean }[];
+    sellerProblems: string[];
+  };
+}
+
+export interface TaxReviewListResponse {
+  reviews: TaxReviewView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface HsnSacView {
+  id: string;
+  code: string;
+  kind: 'HSN' | 'SAC';
+  description: string | null;
+  isActive: boolean;
+  origin: string;
+  reviewStatus: 'UNREVIEWED' | 'REVIEWED';
+  reviewedAt: string | null;
+  reviewedByName: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HsnSacListResponse {
+  entries: HsnSacView[];
+  total: number;
+  limit: number;
+  offset: number;
 }

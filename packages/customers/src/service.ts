@@ -32,7 +32,7 @@ export interface CustomerContext {
 export interface ListOptions {
   search?: string | undefined;
   isActive?: boolean | undefined;
-  customerType?: 'B2C' | 'B2B' | undefined;
+  customerKind?: 'INDIVIDUAL' | 'BUSINESS' | undefined;
   limit: number;
   offset: number;
 }
@@ -45,7 +45,7 @@ export function toCustomerView(r: Row): CustomerView {
   return {
     id: r.id,
     code: r.code,
-    customerType: r.customerType as CustomerView['customerType'],
+    customerKind: r.customerKind as CustomerView['customerKind'],
     legalName: r.legalName,
     displayName: r.displayName,
     contactPerson: r.contactPerson,
@@ -83,7 +83,7 @@ export function toCustomerView(r: Row): CustomerView {
 
 /** Fields whose before/after VALUES are safe to put in the audit log (no personal data). The rest log names only. */
 const AUDIT_VALUE_FIELDS = new Set([
-  'customerType',
+  'customerKind',
   'gstStatus',
   'paymentTermsDays',
   'creditLimit',
@@ -137,7 +137,7 @@ export function createCustomerService(options: CustomerServiceOptions) {
     const where: Prisma.CustomerWhereInput = {
       organizationId,
       ...(o.isActive === undefined ? {} : { isActive: o.isActive }),
-      ...(o.customerType ? { customerType: o.customerType } : {}),
+      ...(o.customerKind ? { customerKind: o.customerKind } : {}),
       ...(term
         ? {
             OR: [
@@ -191,7 +191,7 @@ export function createCustomerService(options: CustomerServiceOptions) {
   }
 
   const dataOf = (v: NormalizedWithNotes) => ({
-    customerType: v.customerType,
+    customerKind: v.customerKind,
     legalName: v.legalName,
     displayName: v.displayName,
     contactPerson: v.contactPerson,
@@ -288,7 +288,7 @@ export function createCustomerService(options: CustomerServiceOptions) {
         await audit(tx, ctx, 'customer.create', created.id, {
           after: {
             code,
-            customerType: value.customerType,
+            customerKind: value.customerKind,
             gstStatus: value.gstStatus,
             generatedCode: !suppliedCode,
           },

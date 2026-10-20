@@ -15,6 +15,8 @@
     "@commercebill/products": "^0.0.1",
     "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",
+    "@commercebill/tax-config": "^0.0.1",
+    "@commercebill/tax-engine": "^0.0.1",
     "@commercebill/ui": "^0.0.1",
     "@tanstack/react-query": "^5.104.3",
     "react": "^19.3.1",

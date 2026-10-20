@@ -9,6 +9,13 @@ import type {
   CustomerView,
   HsnSacSearchResponse,
   ProductListResponse,
+  HsnSacListResponse,
+  HsnSacView,
+  HsnPolicyView,
+  TaxConfigurationResponse,
+  TaxReviewListResponse,
+  TaxReviewView,
+  BillingMode,
   StockListResponse,
   StockMovementListResponse,
   StockOperationResponse,
@@ -185,7 +192,7 @@ export const completeSetup = (body: unknown): Promise<SetupCompleteResponse> =>
 export interface CustomerQuery {
   search?: string;
   isActive?: boolean;
-  type?: 'B2C' | 'B2B';
+  kind?: 'INDIVIDUAL' | 'BUSINESS';
   limit: number;
   offset: number;
 }
@@ -195,7 +202,7 @@ export function listCustomers(token: string, q: CustomerQuery): Promise<Customer
   const params = new URLSearchParams();
   if (q.search) params.set('search', q.search);
   if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
-  if (q.type) params.set('type', q.type);
+  if (q.kind) params.set('kind', q.kind);
   params.set('limit', String(q.limit));
   params.set('offset', String(q.offset));
   return callApi('GET', `/customers?${params.toString()}`, { token });
@@ -330,3 +337,68 @@ export const postStockOperation = (
   operation: StockOperation,
   body: Record<string, unknown>,
 ): Promise<StockOperationResponse> => callApi('POST', OPERATION_PATH[operation], { token, body });
+
+// ---------------------------------------------------------------------------------------------- tax configuration
+
+export const getTaxConfiguration = (token: string): Promise<TaxConfigurationResponse> =>
+  callApi('GET', '/tax/configuration', { token });
+
+export const listTaxReviews = (
+  token: string,
+  q: { limit: number; offset: number },
+): Promise<TaxReviewListResponse> =>
+  callApi('GET', `/tax/configuration/reviews?limit=${q.limit}&offset=${q.offset}`, { token });
+
+export const postTaxReview = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ review: TaxReviewView }> =>
+  callApi('POST', '/tax/configuration/reviews', { token, body });
+
+export const postBillingMode = (token: string, mode: BillingMode): Promise<{ mode: BillingMode }> =>
+  callApi('POST', '/tax/billing-mode', { token, body: { mode } });
+
+export const putHsnRequirement = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ hsnPolicy: HsnPolicyView }> => callApi('PUT', '/tax/hsn-requirement', { token, body });
+
+export interface HsnQuery {
+  search?: string;
+  kind?: 'HSN' | 'SAC';
+  isActive?: boolean;
+  limit: number;
+  offset: number;
+}
+
+export function listHsnEntries(token: string, q: HsnQuery): Promise<HsnSacListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.kind) params.set('kind', q.kind);
+  if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/tax/hsn-sac?${params.toString()}`, { token });
+}
+
+export const createHsnEntry = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<{ entry: HsnSacView }> => callApi('POST', '/tax/hsn-sac', { token, body });
+
+export const updateHsnEntry = (
+  token: string,
+  id: string,
+  body: Record<string, unknown>,
+): Promise<{ entry: HsnSacView }> =>
+  callApi('PATCH', `/tax/hsn-sac/${encodeURIComponent(id)}`, { token, body });
+
+export const reviewHsnEntry = (
+  token: string,
+  id: string,
+  expectedVersion: number,
+): Promise<{ entry: HsnSacView }> =>
+  callApi('POST', `/tax/hsn-sac/${encodeURIComponent(id)}/review`, {
+    token,
+    body: { expectedVersion },
+  });

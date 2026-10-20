@@ -79,7 +79,7 @@ async function seedCustomers(count: number, prefix: string, organizationId = fx.
     data: Array.from({ length: count }, (_, i) => ({
       organizationId,
       code: `${prefix}-${String(i + 1).padStart(4, '0')}`,
-      customerType: 'B2C',
+      customerKind: 'INDIVIDUAL',
       legalName: `${prefix} Customer ${String(i + 1).padStart(3, '0')}`,
       billingAddressLine1: '1 Seed Street',
       billingStateCode: '27',
@@ -170,7 +170,7 @@ describe('customers through the real UI, API and database', () => {
     const row = await fx.prisma.customer.findFirstOrThrow({ where: { code: 'CUS-000001' } });
     expect(row).toMatchObject({
       organizationId: fx.orgId,
-      customerType: 'B2B',
+      customerKind: 'BUSINESS',
       legalName: 'Riverside Traders Pvt Ltd',
       gstStatus: 'REGISTERED',
       gstin: gstin(PAN),

@@ -131,6 +131,11 @@ describe('reference seed: idempotency (A)', () => {
     const gst18 = await prisma.taxCategory.findFirstOrThrow({
       where: { organizationId: orgId, code: 'GST_18' },
     });
+    // Since Task 1.12 effective dates cannot overlap: the seeded open-ended row is closed first, as a user would do.
+    await prisma.taxRate.updateMany({
+      where: { categoryId: gst18.id, effectiveTo: null },
+      data: { effectiveTo: new Date('2027-03-31') },
+    });
     await prisma.taxRate.create({
       data: {
         organizationId: orgId,

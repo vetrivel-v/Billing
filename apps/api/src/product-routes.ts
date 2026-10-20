@@ -116,7 +116,7 @@ export async function registerProductRoutes(
       async (req): Promise<HsnSacSearchResponse> => {
         const q = hsnQuery.safeParse(req.query);
         if (!q.success) throw bad('Invalid query.');
-        return service.searchHsn(q.data);
+        return service.searchHsn(req.auth!.organizationId, q.data);
       },
     );
 

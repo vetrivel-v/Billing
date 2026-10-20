@@ -250,7 +250,6 @@ export function CustomerFormPage() {
     );
   }
 
-  const b2c = form.customerType === 'B2C';
   const delivery = deliveryStateCode(form);
   const needsGstin = form.gstStatus === 'REGISTERED' || form.gstStatus === 'COMPOSITION';
   const inactive = customer ? !customer.isActive : false;
@@ -350,27 +349,21 @@ export function CustomerFormPage() {
         <Section title="Basic details">
           <div className={wide}>
             <RadioGroup
-              legend="Customer type"
-              name="customerType"
+              legend="Customer kind"
+              name="customerKind"
               layout="row"
-              value={form.customerType}
-              onChange={(v) =>
-                set(
-                  v === 'B2C'
-                    ? { customerType: 'B2C', gstStatus: 'UNREGISTERED', gstin: '' }
-                    : { customerType: 'B2B' },
-                )
-              }
+              value={form.customerKind}
+              onChange={(v) => set({ customerKind: v as CustomerForm['customerKind'] })}
               options={[
                 {
-                  value: 'B2B',
-                  label: 'B2B - business',
-                  description: 'A business that may have a GST registration.',
+                  value: 'BUSINESS',
+                  label: 'Business',
+                  description: 'A company, shop or other organisation.',
                 },
                 {
-                  value: 'B2C',
-                  label: 'B2C - consumer',
-                  description: 'An individual buying for personal use; never GST registered.',
+                  value: 'INDIVIDUAL',
+                  label: 'Individual',
+                  description: 'A person buying for themselves.',
                 },
               ]}
             />
@@ -417,67 +410,56 @@ export function CustomerFormPage() {
         </Section>
 
         <Section title="Tax details">
-          {b2c ? (
-            <p className="text-sm text-slate-600 md:col-span-2 xl:col-span-3">
-              Consumers (B2C) are not GST registered, so no GSTIN is needed. Choose B2B above for a
-              business with a GST registration.
+          <SelectField
+            label="GST registration"
+            requirement="required"
+            name="gstStatus"
+            value={form.gstStatus}
+            disabled={readOnly || saving}
+            error={errors.gstStatus}
+            onChange={(e) => {
+              const next = e.target.value as CustomerForm['gstStatus'];
+              set(next === 'UNREGISTERED' ? { gstStatus: next, gstin: '' } : { gstStatus: next });
+            }}
+          >
+            <option value="REGISTERED">Registered</option>
+            <option value="COMPOSITION">Composition scheme</option>
+            <option value="UNREGISTERED">Not registered</option>
+          </SelectField>
+          {needsGstin && (
+            <TextInput
+              label="GSTIN"
+              requirement="required"
+              name="gstin"
+              maxLength={15}
+              spellCheck={false}
+              autoCapitalize="characters"
+              autoComplete="off"
+              {...text('gstin')}
+              onChange={(e) => set({ gstin: e.target.value.toUpperCase() })}
+            />
+          )}
+          <TextInput
+            label="PAN"
+            requirement="optional"
+            name="pan"
+            maxLength={10}
+            spellCheck={false}
+            autoComplete="off"
+            {...text('pan')}
+            onChange={(e) => set({ pan: e.target.value.toUpperCase() })}
+          />
+          {needsGstin && (
+            <p className="text-xs text-slate-500 md:col-span-2 xl:col-span-3">
+              The GSTIN format and check character are verified here. CommerceBill does not check
+              with the GST portal that a GSTIN is registered or belongs to this customer.
             </p>
-          ) : (
-            <>
-              <SelectField
-                label="GST registration"
-                requirement="required"
-                name="gstStatus"
-                value={form.gstStatus}
-                disabled={readOnly || saving}
-                error={errors.gstStatus}
-                onChange={(e) => {
-                  const next = e.target.value as CustomerForm['gstStatus'];
-                  set(
-                    next === 'UNREGISTERED' ? { gstStatus: next, gstin: '' } : { gstStatus: next },
-                  );
-                }}
-              >
-                <option value="REGISTERED">Registered</option>
-                <option value="COMPOSITION">Composition scheme</option>
-                <option value="UNREGISTERED">Not registered</option>
-              </SelectField>
-              {needsGstin && (
-                <TextInput
-                  label="GSTIN"
-                  requirement={form.gstStatus === 'REGISTERED' ? 'required' : 'optional'}
-                  name="gstin"
-                  maxLength={15}
-                  spellCheck={false}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  {...text('gstin')}
-                  onChange={(e) => set({ gstin: e.target.value.toUpperCase() })}
-                />
-              )}
-              <TextInput
-                label="PAN"
-                requirement="optional"
-                name="pan"
-                maxLength={10}
-                spellCheck={false}
-                autoComplete="off"
-                {...text('pan')}
-                onChange={(e) => set({ pan: e.target.value.toUpperCase() })}
-              />
-              {needsGstin && (
-                <p className="text-xs text-slate-500 md:col-span-2 xl:col-span-3">
-                  The GSTIN format and check character are verified here. CommerceBill does not
-                  check with the GST portal that a GSTIN is registered or belongs to this customer.
-                </p>
-              )}
-            </>
           )}
           <SelectField
             label="Place of supply"
             requirement="optional"
             name="placeOfSupplyStateCode"
-            hint="Used later to work out tax. Defaults to the delivery state."
+            hint="A suggestion for new invoices (you confirm it on each invoice). Defaults to the delivery state."
             value={form.placeOfSupplyStateCode}
             disabled={readOnly || saving}
             error={errors.placeOfSupplyStateCode}

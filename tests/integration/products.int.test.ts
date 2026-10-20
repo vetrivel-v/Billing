@@ -81,12 +81,22 @@ beforeAll(async () => {
   // The HSN/SAC reference list is empty after seeding (it needs reviewed data): add two fictional entries.
   hsnId = (
     await fx.prisma.hsnSacCode.create({
-      data: { code: '8517', kind: 'HSN', description: 'Telephone sets' },
+      data: {
+        organizationId: fx.orgId,
+        code: '8517',
+        kind: 'HSN',
+        description: 'Telephone sets',
+      },
     })
   ).id;
   sacId = (
     await fx.prisma.hsnSacCode.create({
-      data: { code: '998314', kind: 'SAC', description: 'IT consulting' },
+      data: {
+        organizationId: fx.orgId,
+        code: '998314',
+        kind: 'SAC',
+        description: 'IT consulting',
+      },
     })
   ).id;
 }, 120_000);

@@ -53,7 +53,7 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const term = useDebounced(search.trim(), 300);
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
-  const [type, setType] = useState<'' | 'B2C' | 'B2B'>('');
+  const [kind, setKind] = useState<'' | 'INDIVIDUAL' | 'BUSINESS'>('');
   // The page belongs to the search term it was chosen for. A changed term resets the page DURING RENDER (React's
   // supported "adjust state on prop change" pattern) rather than in an effect, which could run after a click on Next and
   // silently undo it - and which would leave a remembered page behind for a term the user returns to.
@@ -68,7 +68,7 @@ export function CustomersPage() {
   const query = {
     ...(term ? { search: term } : {}),
     ...(status === 'all' ? {} : { isActive: status === 'active' }),
-    ...(type ? { type } : {}),
+    ...(kind ? { kind } : {}),
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   };
@@ -80,11 +80,11 @@ export function CustomersPage() {
   });
 
   const data = result.data;
-  const filtered = Boolean(term) || status !== 'active' || type !== '';
+  const filtered = Boolean(term) || status !== 'active' || kind !== '';
   const clearFilters = () => {
     setSearch('');
     setStatus('active');
-    setType('');
+    setKind('');
     setPage(0);
   };
 
@@ -127,16 +127,16 @@ export function CustomersPage() {
           <option value="all">All</option>
         </SelectField>
         <SelectField
-          label="Type"
-          value={type}
+          label="Kind"
+          value={kind}
           onChange={(e) => {
-            setType(e.target.value as typeof type);
+            setKind(e.target.value as typeof kind);
             setPage(0);
           }}
         >
-          <option value="">All types</option>
-          <option value="B2B">B2B</option>
-          <option value="B2C">B2C</option>
+          <option value="">All kinds</option>
+          <option value="BUSINESS">Business</option>
+          <option value="INDIVIDUAL">Individual</option>
         </SelectField>
       </div>
 
@@ -159,7 +159,7 @@ export function CustomersPage() {
               </Button>
             }
           >
-            Try a different search, or change the status and type filters.
+            Try a different search, or change the status and kind filters.
           </EmptyState>
         ) : (
           <EmptyState
@@ -192,7 +192,7 @@ export function CustomersPage() {
                     Customer
                   </th>
                   <th scope="col" className="px-3 py-2">
-                    Type
+                    Kind
                   </th>
                   <th scope="col" className="px-3 py-2">
                     GST
@@ -224,8 +224,8 @@ export function CustomersPage() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={c.customerType === 'B2B' ? 'brand' : 'neutral'}>
-                        {c.customerType}
+                      <Badge tone={c.customerKind === 'BUSINESS' ? 'brand' : 'neutral'}>
+                        {c.customerKind === 'BUSINESS' ? 'Business' : 'Individual'}
                       </Badge>
                     </td>
                     <td className="px-3 py-2">

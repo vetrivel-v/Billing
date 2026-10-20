@@ -1,10 +1,10 @@
 import { validateCustomer } from '@commercebill/customers/browser';
 import { INDIA_STATE_CODES } from '@commercebill/setup/browser';
-import type { CustomerGstStatus, CustomerType, CustomerView } from '@commercebill/shared-types';
+import type { CustomerGstStatus, CustomerKind, CustomerView } from '@commercebill/shared-types';
 
 /** Form state: every value is a string (or boolean) exactly as typed. Conversion to the API shape is in toApiBody. */
 export interface CustomerForm {
-  customerType: CustomerType;
+  customerKind: CustomerKind;
   code: string;
   legalName: string;
   displayName: string;
@@ -35,7 +35,7 @@ export interface CustomerForm {
 
 export function emptyCustomerForm(): CustomerForm {
   return {
-    customerType: 'B2B',
+    customerKind: 'BUSINESS',
     code: '',
     legalName: '',
     displayName: '',
@@ -72,7 +72,7 @@ export function formFromCustomer(c: CustomerView): CustomerForm {
     ? c.billingStateCode
     : (c.shippingStateCode ?? c.billingStateCode);
   return {
-    customerType: c.customerType,
+    customerKind: c.customerKind,
     code: c.code,
     legalName: c.legalName,
     displayName: s(c.displayName),
@@ -113,15 +113,14 @@ export function deliveryStateCode(f: CustomerForm): string {
 }
 
 /**
- * The request body. A blank optional value is sent as null so an edit CLEARS it; GST fields follow the type
- * (a B2C customer is always unregistered, an unregistered one has no GSTIN).
+ * The request body. A blank optional value is sent as null so an edit CLEARS it; GST fields follow the GST status
+ * alone (an unregistered customer has no GSTIN; the customer kind has no tax meaning).
  */
 export function toApiBody(f: CustomerForm, creating: boolean): Record<string, unknown> {
   const n = (v: string) => (v.trim() === '' ? null : v.trim());
-  const b2c = f.customerType === 'B2C';
-  const status: CustomerGstStatus = b2c ? 'UNREGISTERED' : f.gstStatus;
+  const status: CustomerGstStatus = f.gstStatus;
   const body: Record<string, unknown> = {
-    customerType: f.customerType,
+    customerKind: f.customerKind,
     legalName: f.legalName.trim(),
     displayName: n(f.displayName),
     contactPerson: n(f.contactPerson),
@@ -174,8 +173,6 @@ const RULE_TEXT: Record<string, string> = {
   invalid_pin_code: 'PIN code must be 6 digits and must not start with 0.',
   invalid_amount: 'Enter an amount such as 25000 or 25000.50.',
   out_of_range: 'Enter a whole number of days from 0 to 365.',
-  b2c_must_be_unregistered:
-    'A B2C (consumer) customer cannot be GST registered. Choose B2B for a business.',
   unknown_field: 'This value is not accepted.',
 };
 const GENERIC = 'This value is not acceptable.';
@@ -183,7 +180,7 @@ export const ruleText = (rule: string): string => RULE_TEXT[rule] ?? GENERIC;
 
 export const FIELD_LABELS: Record<string, string> = {
   code: 'Customer code',
-  customerType: 'Customer type',
+  customerKind: 'Customer kind',
   legalName: 'Customer name',
   displayName: 'Display name',
   contactPerson: 'Contact person',

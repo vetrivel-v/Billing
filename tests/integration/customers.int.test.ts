@@ -42,7 +42,7 @@ const list = (r: { json: ApiJson }) =>
   r.json as unknown as { customers: Cust[]; total: number; limit: number; offset: number };
 
 const b2c = (over: Record<string, unknown> = {}) => ({
-  customerType: 'B2C',
+  customerKind: 'INDIVIDUAL',
   legalName: 'Walk-in Customer',
   billingAddressLine1: '1 Test Lane',
   billingStateCode: '27',
@@ -52,7 +52,7 @@ const b2c = (over: Record<string, unknown> = {}) => ({
 const b2b = (over: Record<string, unknown> = {}) => {
   const pan = uniqPan();
   return {
-    customerType: 'B2B',
+    customerKind: 'BUSINESS',
     legalName: `Fictional Buyer ${seq} Pvt Ltd`,
     billingAddressLine1: '22 Example Street',
     billingStateCode: '27',
@@ -91,7 +91,7 @@ describe('creating customers', () => {
     const c = cust(r);
     expect(c.code).toMatch(/^CUS-\d{6,}$/);
     expect(c).toMatchObject({
-      customerType: 'B2C',
+      customerKind: 'INDIVIDUAL',
       gstStatus: 'UNREGISTERED',
       gstin: null,
       isActive: true,
@@ -175,11 +175,29 @@ describe('creating customers', () => {
     const unregWithGstin = await post(b2b({ gstStatus: 'UNREGISTERED' }));
     expect(problems(unregWithGstin)).toEqual([{ field: 'gstin', rule: 'gstin_not_allowed' }]);
 
-    const b2cRegistered = await post(b2c({ gstStatus: 'REGISTERED', gstin: gstin('27', PAN_A) }));
-    expect(problems(b2cRegistered)).toContainEqual({
-      field: 'gstStatus',
-      rule: 'b2c_must_be_unregistered',
+    // The customer kind is independent of GST registration: an individual may be registered (and then needs a GSTIN).
+    const individualRegistered = await post(
+      b2c({
+        gstStatus: 'REGISTERED',
+        gstin: gstin('27', uniqPan()),
+        legalName: 'Registered Individual',
+      }),
+    );
+    expect(individualRegistered.json.error?.problems).toBeUndefined();
+    expect(individualRegistered.status).toBe(201);
+    expect(cust(individualRegistered)).toMatchObject({
+      customerKind: 'INDIVIDUAL',
+      gstStatus: 'REGISTERED',
     });
+    const compositionNoGstin = await post(
+      b2b({
+        gstStatus: 'COMPOSITION',
+        gstin: undefined,
+        pan: undefined,
+        legalName: 'Composition Co',
+      }),
+    );
+    expect(problems(compositionNoGstin)).toEqual([{ field: 'gstin', rule: 'gstin_required' }]);
 
     const unregB2b = await post(
       b2b({
@@ -190,15 +208,12 @@ describe('creating customers', () => {
       }),
     );
     expect(unregB2b.status).toBe(201); // a business without GST registration needs no GSTIN
+    // a composition-scheme customer is registered too: it has a GSTIN (it was optional before Task 1.12)
     const composition = await post(
-      b2b({
-        gstStatus: 'COMPOSITION',
-        gstin: undefined,
-        pan: undefined,
-        legalName: 'Composition Trader',
-      }),
+      b2b({ gstStatus: 'COMPOSITION', legalName: 'Composition Trader' }),
     );
     expect(composition.status).toBe(201);
+    expect(cust(composition)).toMatchObject({ gstStatus: 'COMPOSITION' });
   });
 
   it('validates the other fields with value-free problems and rejects unknown or smuggled fields', async () => {
@@ -334,7 +349,7 @@ describe('listing, search and reading', () => {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
     expect(new Set(names).size).toBe(8);
     expect(p1).toMatchObject({ limit: 3, offset: 0 });
-    for (const q of ['limit=101', 'limit=0', 'offset=-1', 'isActive=maybe', 'type=B3']) {
+    for (const q of ['limit=101', 'limit=0', 'offset=-1', 'isActive=maybe', 'kind=B3']) {
       expect((await call(app, 'GET', `/customers?${q}`, { token: admin() })).status, q).toBe(400);
     }
   });
@@ -369,9 +384,9 @@ describe('listing, search and reading', () => {
 
   it('filters by type and by active status', async () => {
     const b2bOnly = list(
-      await call(app, 'GET', '/customers?type=B2B&limit=100', { token: admin() }),
+      await call(app, 'GET', '/customers?kind=BUSINESS&limit=100', { token: admin() }),
     );
-    expect(b2bOnly.customers.every((c) => c.customerType === 'B2B')).toBe(true);
+    expect(b2bOnly.customers.every((c) => c.customerKind === 'BUSINESS')).toBe(true);
     const victim = cust(await post(b2c({ legalName: 'Filter Victim' })));
     await call(app, 'POST', `/customers/${victim.id}/deactivate`, { token: admin(), body: {} });
     const inactive = list(
@@ -441,14 +456,23 @@ describe('editing, activation and concurrency', () => {
       pan: null,
     });
     expect(cust(ok)).toMatchObject({ gstStatus: 'UNREGISTERED', gstin: null });
-    const toB2c = await patch(b.id, { expectedVersion: 2, customerType: 'B2C' });
-    expect(toB2c.status).toBe(200);
-    const registerB2c = await patch(b.id, {
+    const toIndividual = await patch(b.id, { expectedVersion: 2, customerKind: 'INDIVIDUAL' });
+    expect(toIndividual.status).toBe(200);
+    // the kind never constrains the GST status: a registered individual is valid, and a composition customer needs a GSTIN
+    const registered = await patch(b.id, {
       expectedVersion: 3,
       gstStatus: 'REGISTERED',
       gstin: gstin('27', uniqPan()),
     });
-    expect(registerB2c.status).toBe(400);
+    expect(registered.status).toBe(200);
+    const compositionWithoutGstin = await patch(b.id, {
+      expectedVersion: 4,
+      gstStatus: 'COMPOSITION',
+      gstin: null,
+    });
+    expect(compositionWithoutGstin.json.error.problems).toEqual([
+      { field: 'gstin', rule: 'gstin_required' },
+    ]);
   });
 
   it('the place of supply follows an address change unless set explicitly; the code never changes', async () => {
@@ -806,7 +830,7 @@ describe('audit and logs', () => {
     expect(created!.correlationId).toBeTruthy();
     expect(created!.afterValues).toMatchObject({
       code: c.code,
-      customerType: 'B2C',
+      customerKind: 'INDIVIDUAL',
       gstStatus: 'UNREGISTERED',
       generatedCode: true,
     });

@@ -11,7 +11,7 @@ import {
  * submitted value.
  */
 
-export const CUSTOMER_TYPES = ['B2C', 'B2B'] as const;
+export const CUSTOMER_KINDS = ['INDIVIDUAL', 'BUSINESS'] as const;
 export const GST_STATUSES = ['REGISTERED', 'UNREGISTERED', 'COMPOSITION'] as const;
 
 export interface Problem {
@@ -22,7 +22,7 @@ export interface Problem {
 /** The fields a client may send. `code` is accepted on creation only. */
 export const CUSTOMER_FIELDS = [
   'code',
-  'customerType',
+  'customerKind',
   'legalName',
   'displayName',
   'contactPerson',
@@ -52,7 +52,7 @@ export type CustomerField = (typeof CUSTOMER_FIELDS)[number];
 
 /** The normalised customer as stored (everything trimmed, empty -> null, identifiers upper-cased). */
 export interface NormalizedCustomer {
-  customerType: 'B2C' | 'B2B';
+  customerKind: 'INDIVIDUAL' | 'BUSINESS';
   legalName: string;
   displayName: string | null;
   contactPerson: string | null;
@@ -140,8 +140,9 @@ export function validateCustomer(
     return t;
   };
 
-  const customerType = raw.customerType;
-  if (customerType !== 'B2C' && customerType !== 'B2B') add('customerType', 'invalid_value');
+  const customerKind = raw.customerKind;
+  if (customerKind !== 'INDIVIDUAL' && customerKind !== 'BUSINESS')
+    add('customerKind', 'invalid_value');
 
   const legalName = str('legalName', MAX.legalName, true);
   const displayName = str('displayName', MAX.displayName);
@@ -157,9 +158,6 @@ export function validateCustomer(
   const gstStatus = raw.gstStatus;
   if (!(GST_STATUSES as readonly string[]).includes(gstStatus as string))
     add('gstStatus', 'invalid_value');
-  if (customerType === 'B2C' && gstStatus !== undefined && gstStatus !== 'UNREGISTERED') {
-    add('gstStatus', 'b2c_must_be_unregistered');
-  }
 
   const panRaw = str('pan', 10);
   const pan = panRaw ? panRaw.toUpperCase() : null;
@@ -177,7 +175,8 @@ export function validateCustomer(
   const pin = str('billingPinCode', 6);
   if (pin && !isValidPinCode(pin)) add('billingPinCode', 'invalid_pin_code');
 
-  if (gstStatus === 'REGISTERED' && !gstin) add('gstin', 'gstin_required');
+  if ((gstStatus === 'REGISTERED' || gstStatus === 'COMPOSITION') && !gstin)
+    add('gstin', 'gstin_required');
   if (gstStatus === 'UNREGISTERED' && gstin) add('gstin', 'gstin_not_allowed');
   if (gstin && gstStatus !== 'UNREGISTERED') {
     const structural = checkGstinStructure(gstin);
@@ -246,7 +245,7 @@ export function validateCustomer(
     !line1 ||
     !billingState ||
     !place ||
-    (customerType !== 'B2C' && customerType !== 'B2B') ||
+    (customerKind !== 'INDIVIDUAL' && customerKind !== 'BUSINESS') ||
     (gstStatus !== 'REGISTERED' && gstStatus !== 'UNREGISTERED' && gstStatus !== 'COMPOSITION')
   ) {
     return { ok: false, problems };
@@ -255,7 +254,7 @@ export function validateCustomer(
     ok: true,
     code,
     value: {
-      customerType,
+      customerKind,
       legalName,
       displayName,
       contactPerson,

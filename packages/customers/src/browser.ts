@@ -1,7 +1,7 @@
 // Browser-safe subset (pure functions only): the customer form runs the SAME validation as the server for early feedback.
 export {
   CODE_PATTERN,
-  CUSTOMER_TYPES,
+  CUSTOMER_KINDS,
   GST_STATUSES,
   validateCustomer,
   type NormalizedWithNotes,

@@ -180,7 +180,7 @@ export function createProductService(options: ProductServiceOptions) {
         where: { organizationId, isActive: true },
         orderBy: { code: 'asc' },
       }),
-      prisma.hsnSacCode.count(),
+      prisma.hsnSacCode.count({ where: { organizationId, isActive: true } }),
     ]);
     return {
       units: units.map((u) => ({
@@ -199,15 +199,20 @@ export function createProductService(options: ProductServiceOptions) {
     };
   }
 
-  /** HSN/SAC reference lookup (a global reference list): prefix search on the code, text search on the description. */
-  async function searchHsn(o: {
-    kind?: 'HSN' | 'SAC' | undefined;
-    search?: string | undefined;
-    limit: number;
-    offset: number;
-  }): Promise<HsnSacSearchResponse> {
+  /** HSN/SAC lookup in THE ORGANIZATION'S OWN user-maintained list (active entries): prefix search on the code, text search on the description. */
+  async function searchHsn(
+    organizationId: string,
+    o: {
+      kind?: 'HSN' | 'SAC' | undefined;
+      search?: string | undefined;
+      limit: number;
+      offset: number;
+    },
+  ): Promise<HsnSacSearchResponse> {
     const term = o.search?.trim().replace(/[\\%_]/g, (ch) => '\\' + ch);
     const where: Prisma.HsnSacCodeWhereInput = {
+      organizationId,
+      isActive: true,
       ...(o.kind ? { kind: o.kind } : {}),
       ...(term
         ? {
@@ -304,8 +309,10 @@ export function createProductService(options: ProductServiceOptions) {
       problems.push({ field: 'taxCategoryId', rule: 'inactive_reference' });
     }
     if (v.hsnSacCodeId) {
-      const code = await tx.hsnSacCode.findUnique({ where: { id: v.hsnSacCodeId } });
+      const code = await tx.hsnSacCode.findFirst({ where: { id: v.hsnSacCodeId, organizationId } });
       if (!code) problems.push({ field: 'hsnSacCodeId', rule: 'unknown_reference' });
+      else if (!code.isActive && current?.hsnSacCodeId !== v.hsnSacCodeId)
+        problems.push({ field: 'hsnSacCodeId', rule: 'inactive_reference' });
       else if ((v.kind === 'GOODS' ? 'HSN' : 'SAC') !== code.kind) {
         problems.push({
           field: 'hsnSacCodeId',

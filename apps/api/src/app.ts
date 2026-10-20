@@ -19,8 +19,10 @@ import { registerUserRoutes } from './user-routes.js';
 import { registerCustomerRoutes } from './customer-routes.js';
 import { registerInventoryRoutes } from './inventory-routes.js';
 import { registerProductRoutes } from './product-routes.js';
+import { registerTaxRoutes } from './tax-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
 import { createProductService } from '@commercebill/products';
+import { createTaxConfigService } from '@commercebill/tax-config';
 import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
 import { ApiHttpError } from './errors.js';
@@ -241,6 +243,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     await registerInventoryRoutes(
       app,
       createInventoryService({
+        prisma: deps.prisma,
+        appVersion: APP_VERSION,
+        ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      }),
+    );
+    await registerTaxRoutes(
+      app,
+      createTaxConfigService({
         prisma: deps.prisma,
         appVersion: APP_VERSION,
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),

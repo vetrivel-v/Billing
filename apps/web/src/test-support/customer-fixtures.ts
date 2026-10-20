@@ -8,7 +8,7 @@ export function customer(over: Partial<CustomerView> = {}): CustomerView {
   return {
     id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
     code: `CUS-${String(n).padStart(6, '0')}`,
-    customerType: 'B2C',
+    customerKind: 'INDIVIDUAL',
     legalName: `Fictional Customer ${n}`,
     displayName: null,
     contactPerson: null,

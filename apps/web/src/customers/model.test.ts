@@ -31,12 +31,21 @@ describe('toApiBody', () => {
     expect(toApiBody({ ...filled(), code: 'ACME-1' }, false)).not.toHaveProperty('code');
   });
 
-  it('forces a B2C customer to unregistered and an unregistered one to have no GSTIN', () => {
-    const b2c = toApiBody(
-      { ...filled(), customerType: 'B2C', gstStatus: 'REGISTERED', gstin: '27ABCDE1234F1Z0' },
+  it('sends GST facts by GST status alone (the kind has no tax meaning) and an unregistered one has no GSTIN', () => {
+    const individual = toApiBody(
+      {
+        ...filled(),
+        customerKind: 'INDIVIDUAL',
+        gstStatus: 'REGISTERED',
+        gstin: '27ABCDE1234F1Z0',
+      },
       true,
     );
-    expect(b2c).toMatchObject({ gstStatus: 'UNREGISTERED', gstin: null });
+    expect(individual).toMatchObject({
+      customerKind: 'INDIVIDUAL',
+      gstStatus: 'REGISTERED',
+      gstin: '27ABCDE1234F1Z0',
+    });
     const unreg = toApiBody({ ...filled(), gstStatus: 'UNREGISTERED', gstin: 'X' }, true);
     expect(unreg).toMatchObject({ gstin: null });
   });

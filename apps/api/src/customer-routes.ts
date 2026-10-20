@@ -13,7 +13,7 @@ const idParams = z.object({ id: z.uuid() });
 const listQuery = z.object({
   search: z.string().trim().max(100).optional(),
   isActive: z.enum(['true', 'false']).optional(),
-  type: z.enum(['B2C', 'B2B']).optional(),
+  kind: z.enum(['INDIVIDUAL', 'BUSINESS']).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
@@ -84,7 +84,7 @@ export async function registerCustomerRoutes(
         const { customers, total } = await service.list(req.auth!.organizationId, {
           search: q.data.search,
           isActive: q.data.isActive === undefined ? undefined : q.data.isActive === 'true',
-          customerType: q.data.type,
+          customerKind: q.data.kind,
           limit: q.data.limit,
           offset: q.data.offset,
         });
