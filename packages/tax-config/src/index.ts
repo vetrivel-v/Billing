@@ -2,6 +2,7 @@ export {
   TaxConfigError,
   createTaxConfigService,
   toHsnView,
+  type TaxBillingContext,
   type TaxConfigContext,
   type TaxConfigErrorCode,
   type TaxConfigService,

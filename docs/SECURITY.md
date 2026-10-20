@@ -64,3 +64,12 @@ reviewed in the diff.
 - [ ] IPC argument validation for every channel (Phase 1+)
 - [x] Sensitive-data logging prevention test for header secrets (Task 1.0); extend per new secret field
 - [ ] Backup encryption / wrong password / corruption (Phase 1)
+
+## Task 1.13 controls (sales invoices)
+
+- Exact permission keys: `sales.invoice.write` (preview), `sales.invoice.post` (post), `sales.invoice.read` (list/get); organization from the session; another organization's ids are not found.
+- The browser sends choices only. Unknown fields are refused; prices, rates, totals and the organization are never trusted from the request.
+- Posted invoices are immutable in the database (triggers) as well as in the API; deferred constraints keep numbers, totals and stock effects consistent at COMMIT.
+- Idempotency by operation id; the same id with different content is refused.
+- Logs and the `invoice.post` audit row carry no customer name, address, GSTIN or search text.
+- Production posting is refused until the Task 1.12 gate is met (needs the Task 1.17 backup/restore fact); the test seam is a default-false dependency.

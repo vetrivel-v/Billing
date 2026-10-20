@@ -18,11 +18,14 @@ import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
 import { registerUserRoutes } from './user-routes.js';
 import { registerCustomerRoutes } from './customer-routes.js';
 import { registerInventoryRoutes } from './inventory-routes.js';
+import { registerInvoiceRoutes } from './invoice-routes.js';
 import { registerProductRoutes } from './product-routes.js';
 import { registerTaxRoutes } from './tax-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
 import { createProductService } from '@commercebill/products';
 import { createTaxConfigService } from '@commercebill/tax-config';
+import { createInvoiceService } from '@commercebill/invoicing';
+import { createNumberingService } from '@commercebill/numbering';
 import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
 import { ApiHttpError } from './errors.js';
@@ -44,6 +47,11 @@ export interface AppDeps {
     clock?: () => Date;
     allowWeakHashingForTests?: boolean;
   };
+  /**
+   * Whether a verified backup AND restore exists for an organization (the production-gate fact that Task 1.17 will provide).
+   * Absent = false, so production billing is refused. Tests inject a value to exercise the production paths in isolation.
+   */
+  backupRestoreVerified?: ((organizationId: string) => Promise<boolean>) | undefined;
   /** Global request limiter. Default 300 requests per minute. */
   globalRateLimit?: LoginRateLimit;
   /** Per-route limit for POST /auth/login. Default 10 requests per minute. */
@@ -157,6 +165,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
           dataSaved: false,
           correlationId: req.id,
           ...(err.problems ? { problems: err.problems } : {}),
+          ...(err.details ? { details: err.details } : {}),
         },
       };
       void reply.code(err.statusCode).send(known);
@@ -248,10 +257,22 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
       }),
     );
-    await registerTaxRoutes(
+    const taxConfigService = createTaxConfigService({
+      prisma: deps.prisma,
+      appVersion: APP_VERSION,
+      ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      ...(deps.backupRestoreVerified ? { backupRestoreVerified: deps.backupRestoreVerified } : {}),
+    });
+    await registerTaxRoutes(app, taxConfigService);
+    await registerInvoiceRoutes(
       app,
-      createTaxConfigService({
+      createInvoiceService({
         prisma: deps.prisma,
+        taxConfig: taxConfigService,
+        numbering: createNumberingService({
+          appVersion: APP_VERSION,
+          ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+        }),
         appVersion: APP_VERSION,
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
       }),

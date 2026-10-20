@@ -270,6 +270,48 @@ export function createTaxConfigService(options: TaxConfigServiceOptions) {
     return { gate, sellerProblems, org };
   }
 
+  /**
+   * Everything billing needs to know about the tax configuration, read on the given client (pass the posting transaction to
+   * read it consistently): the billing mode, the configuration fingerprint, the review state, the production gate, the HSN/SAC
+   * policy and the categories/rates in the shape the pure rate selector takes.
+   */
+  async function billingContext(db: Db, organizationId: string) {
+    const categories = await loadCategories(db, organizationId);
+    const fingerprint = fingerprintOf(categories);
+    const latest = await latestReview(db, organizationId);
+    const state = reviewState(latest?.fingerprint ?? null, fingerprint);
+    const { gate, sellerProblems } = await gateFor(db, organizationId, state);
+    const categoryRows: CategoryRow[] = categories.map((c) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      classification: c.classification,
+      isActive: c.isActive,
+      effectiveFrom: dateText(c.effectiveFrom),
+      effectiveTo: dateText(c.effectiveTo),
+    }));
+    const rateRows: RateRow[] = categories.flatMap((c) =>
+      c.rates.map((r) => ({
+        id: r.id,
+        categoryId: c.id,
+        ratePercent: r.ratePercent.toFixed(4),
+        cessPercent: r.cessPercent.toFixed(4),
+        effectiveFrom: dateText(r.effectiveFrom)!,
+        effectiveTo: dateText(r.effectiveTo),
+      })),
+    );
+    return {
+      mode: await billingMode(db, organizationId),
+      fingerprint,
+      review: { state, latestId: latest?.id ?? null },
+      gate,
+      sellerProblems,
+      hsnPolicy: await hsnPolicy(db, organizationId),
+      categoryRows,
+      rateRows,
+    };
+  }
+
   async function getConfiguration(organizationId: string): Promise<TaxConfigurationResponse> {
     const categories = await loadCategories(prisma, organizationId);
     const fingerprint = fingerprintOf(categories);
@@ -671,7 +713,9 @@ export function createTaxConfigService(options: TaxConfigServiceOptions) {
     setHsnPolicy,
     setBillingMode,
     currentFingerprint: (organizationId: string) => currentFingerprint(prisma, organizationId),
+    billingContext,
   };
 }
 
 export type TaxConfigService = ReturnType<typeof createTaxConfigService>;
+export type TaxBillingContext = Awaited<ReturnType<TaxConfigService['billingContext']>>;

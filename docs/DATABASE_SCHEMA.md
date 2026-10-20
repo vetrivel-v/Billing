@@ -199,6 +199,21 @@ cleared or changed). Existing violating rows make the migration abort atomically
   `ruleset_version`, `jurisdiction_ruleset_version`, `created_at`. Index `(organization_id, created_at desc)`.
 - No schema for billing mode, HSN/SAC policy or the review gate state: they use `organization_settings` keys (`billing_mode`, `hsn_sac_requirement`); the gate is computed.
 
+### 3.10 Changes in migration `20261026000000_task_1_13_sales_invoices` (Task 1.13)
+
+- New table `sales_invoices` (immutable, POSTED only): organization, `post_operation_id` (unique per organization), `request_fingerprint`, `document_type` (INVOICE | DEMO_INVOICE), `document_number`
+  (unique per organization and type), `is_demo`, invoice date, financial year, currency (INR), location and warehouse, seller / customer / billing / shipping snapshots, recipient class,
+  place of supply (state, source, confirming user, time), price basis, engine / ruleset / rounding versions, `tax_input_hash`, `tax_configuration_fingerprint`, optional `tax_review_id`
+  (required for production), the full calculation JSON and all totals. CHECK constraints keep the formats, totals and demo/production rules consistent.
+- New table `sales_invoice_lines`: composite foreign key to the invoice and organization, line number, product / unit / HSN-SAC / tax category and rate snapshots, quantity, price, discount,
+  taxable value, component rates and amounts, line total and `stock_effect` (DISPATCH | NONE).
+- `stock_movements`: the type vocabulary gains `SALES_DISPATCH` (always negative, source type `SALES_INVOICE`).
+- `document_sequences`: every existing INVOICE sequence gains a `DEMO_INVOICE` twin (`DEMO/{FY}/`); setup creates it for new organizations.
+- Triggers: invoices and lines refuse UPDATE, DELETE and TRUNCATE; before-insert checks keep organization consistency and require lines to be inserted in the transaction that created their invoice;
+  deferred constraint triggers at COMMIT verify the number against the allocation ledger, the header totals against the lines, and the bidirectional invoice-line / `SALES_DISPATCH` link.
+- View `production_sales_invoices` (`security_invoker`, `NOT is_demo`) for production reporting.
+- There is no receivable table (Option A, ADR-0024).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

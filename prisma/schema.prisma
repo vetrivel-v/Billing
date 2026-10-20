@@ -61,6 +61,7 @@ model Organization {
   stockMovements            StockMovement[]
   stockBalances             StockBalance[]
   hsnSacCodes               HsnSacCode[]
+  salesInvoices             SalesInvoice[]
   taxConfigurationReviews   TaxConfigurationReview[]
   users                     User[]
   roles                     Role[]
@@ -109,9 +110,10 @@ model BusinessLocation {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int      @default(1)
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  warehouses   Warehouse[]
-  sequences    DocumentSequence[]
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouses    Warehouse[]
+  sequences     DocumentSequence[]
+  salesInvoices SalesInvoice[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -131,8 +133,9 @@ model FinancialYear {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int       @default(1)
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  sequences    DocumentSequence[]
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  sequences     DocumentSequence[]
+  salesInvoices SalesInvoice[]
 
   @@unique([organizationId, label])
   @@index([organizationId, startDate, endDate])
@@ -155,6 +158,7 @@ model Warehouse {
   location       BusinessLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict)
   stockMovements StockMovement[]
   stockBalances  StockBalance[]
+  salesInvoices  SalesInvoice[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -183,13 +187,15 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version            Int       @default(1)
 
-  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  roles          UserRole[]
-  sessions       Session[]
-  auditLogs      AuditLog[]
-  stockMovements StockMovement[]
-  hsnSacReviews  HsnSacCode[]             @relation("HsnSacReviewer")
-  taxReviews     TaxConfigurationReview[] @relation("TaxReviewer")
+  organization      Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roles             UserRole[]
+  sessions          Session[]
+  auditLogs         AuditLog[]
+  stockMovements    StockMovement[]
+  hsnSacReviews     HsnSacCode[]             @relation("HsnSacReviewer")
+  taxReviews        TaxConfigurationReview[] @relation("TaxReviewer")
+  invoicesCreated   SalesInvoice[]           @relation("InvoiceCreator")
+  invoicesConfirmed SalesInvoice[]           @relation("InvoicePosConfirmer")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -354,9 +360,10 @@ model TaxCategory {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int       @default(1)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  rates        TaxRate[]
-  products     Product[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rates             TaxRate[]
+  products          Product[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@unique([organizationId, code])
   @@map("tax_categories")
@@ -382,8 +389,9 @@ model TaxRate {
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int       @default(1)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  category     TaxCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  category          TaxCategory        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@unique([categoryId, effectiveFrom])
   @@index([organizationId, effectiveFrom])
@@ -438,8 +446,9 @@ model TaxConfigurationReview {
   jurisdictionRulesetVersion String   @map("jurisdiction_ruleset_version")
   createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  reviewer     User         @relation("TaxReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  reviewer      User           @relation("TaxReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict)
+  salesInvoices SalesInvoice[]
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("tax_configuration_reviews")
@@ -510,7 +519,8 @@ model Customer {
   updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
   version                Int                   @default(1)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesInvoices SalesInvoice[]
 
   // The GSTIN uniqueness (partial: only where a GSTIN exists) is a partial unique index in the migration.
   @@unique([organizationId, code])
@@ -563,12 +573,13 @@ model Product {
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   version          Int      @default(1)
 
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  hsnSacCode     HsnSacCode?     @relation(fields: [hsnSacCodeId], references: [id], onDelete: Restrict)
-  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  taxCategory    TaxCategory     @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
-  stockMovements StockMovement[]
-  stockBalances  StockBalance[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  hsnSacCode        HsnSacCode?        @relation(fields: [hsnSacCodeId], references: [id], onDelete: Restrict)
+  unit              Unit?              @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  taxCategory       TaxCategory        @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
+  stockMovements    StockMovement[]
+  stockBalances     StockBalance[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   // A barcode is unique per organization when present (partial unique index in the migration).
   @@unique([organizationId, sku])
@@ -649,6 +660,167 @@ model StockBalance {
   @@id([warehouseId, productId])
   @@index([organizationId, productId])
   @@map("stock_balances")
+}
+
+// ---------------------------------------------------------------------------
+// Sales invoices (Task 1.13, ADR-0024)
+// ---------------------------------------------------------------------------
+
+/// A POSTED sales invoice (there are no persisted drafts in Task 1.13). Immutable from its first INSERT: triggers refuse UPDATE,
+/// DELETE and TRUNCATE. Everything printed or reported comes from these snapshot columns and the stored tax calculation, never
+/// from the mutable customer/product/tax masters. `isDemo` invoices use the DEMO_INVOICE number series, never touch the stock
+/// ledger and are never production documents. A production invoice receivable is derived later (grand_total minus payment
+/// allocations, Task 1.16); no receivable is stored here.
+model SalesInvoice {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  status             String   @default("POSTED")
+  /// The client idempotency identity of the posting; one successful post per organization.
+  postOperationId    String   @map("post_operation_id") @db.Uuid
+  /// SHA-256 of the canonical request, so a retry with different content is refused.
+  requestFingerprint String   @map("request_fingerprint")
+  /// INVOICE (production) or DEMO_INVOICE.
+  documentType       String   @map("document_type")
+  documentNumber     String   @map("document_number")
+  isDemo             Boolean  @map("is_demo")
+  invoiceDate        DateTime @map("invoice_date") @db.Date
+  financialYearId    String   @map("financial_year_id") @db.Uuid
+  financialYearLabel String   @map("financial_year_label")
+  currency           String   @default("INR") @db.VarChar(3)
+  locationId         String   @map("location_id") @db.Uuid
+  warehouseId        String   @map("warehouse_id") @db.Uuid
+  warehouseName      String   @map("warehouse_name")
+
+  sellerLegalName    String  @map("seller_legal_name")
+  sellerTradeName    String? @map("seller_trade_name")
+  sellerGstin        String  @map("seller_gstin") @db.VarChar(15)
+  sellerGstStatus    String  @map("seller_gst_status")
+  sellerStateCode    String  @map("seller_state_code") @db.VarChar(2)
+  sellerAddressLine1 String  @map("seller_address_line1")
+  sellerAddressLine2 String? @map("seller_address_line2")
+  sellerCity         String? @map("seller_city")
+  sellerPinCode      String? @map("seller_pin_code")
+
+  customerId           String  @map("customer_id") @db.Uuid
+  customerCode         String  @map("customer_code")
+  customerName         String  @map("customer_name")
+  customerGstStatus    String  @map("customer_gst_status")
+  customerGstin        String? @map("customer_gstin") @db.VarChar(15)
+  billingAddressLine1  String  @map("billing_address_line1")
+  billingAddressLine2  String? @map("billing_address_line2")
+  billingCity          String? @map("billing_city")
+  billingStateCode     String  @map("billing_state_code") @db.VarChar(2)
+  billingPinCode       String? @map("billing_pin_code")
+  /// The delivery address as it was when the invoice was posted (a copy of billing when delivery was the same).
+  shippingAddressLine1 String  @map("shipping_address_line1")
+  shippingAddressLine2 String? @map("shipping_address_line2")
+  shippingCity         String? @map("shipping_city")
+  shippingStateCode    String  @map("shipping_state_code") @db.VarChar(2)
+  shippingPinCode      String? @map("shipping_pin_code")
+  /// B2B exactly when a recipient GSTIN was supplied (derived by the tax engine for THIS document).
+  recipientClass       String  @map("recipient_class")
+
+  posStateCode   String   @map("pos_state_code") @db.VarChar(2)
+  /// USER_CONFIRMED or USER_OVERRIDE (a mere suggestion is never postable).
+  posSource      String   @map("pos_source")
+  posConfirmedBy String   @map("pos_confirmed_by") @db.Uuid
+  posConfirmedAt DateTime @map("pos_confirmed_at") @db.Timestamptz(6)
+
+  priceBasis                  String  @map("price_basis")
+  engineVersion               String  @map("engine_version")
+  rulesetVersion              String  @map("ruleset_version")
+  roundingPolicyId            String  @map("rounding_policy_id")
+  taxInputHash                String  @map("tax_input_hash")
+  taxConfigurationFingerprint String  @map("tax_configuration_fingerprint")
+  /// The review that was current when a PRODUCTION invoice was posted (required for production, null for demo).
+  taxReviewId                 String? @map("tax_review_id") @db.Uuid
+  /// The complete TaxEngine result (lines, totals, explanations, warnings) that produced the numbers below.
+  taxCalculation              Json    @map("tax_calculation")
+
+  grossSubtotal           Decimal @map("gross_subtotal") @db.Decimal(18, 2)
+  lineDiscountTotal       Decimal @map("line_discount_total") @db.Decimal(18, 2)
+  taxableSubtotal         Decimal @map("taxable_subtotal") @db.Decimal(18, 2)
+  cgstTotal               Decimal @map("cgst_total") @db.Decimal(18, 2)
+  sgstTotal               Decimal @map("sgst_total") @db.Decimal(18, 2)
+  utgstTotal              Decimal @map("utgst_total") @db.Decimal(18, 2)
+  igstTotal               Decimal @map("igst_total") @db.Decimal(18, 2)
+  roundingAdjustmentTotal Decimal @map("rounding_adjustment_total") @db.Decimal(18, 2)
+  roundOff                Decimal @map("round_off") @db.Decimal(18, 2)
+  grandTotal              Decimal @map("grand_total") @db.Decimal(18, 2)
+
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  correlationId String?  @map("correlation_id")
+
+  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  financialYear FinancialYear           @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  location      BusinessLocation        @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  warehouse     Warehouse               @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  customer      Customer                @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdByUser User                    @relation("InvoiceCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  posConfirmer  User                    @relation("InvoicePosConfirmer", fields: [posConfirmedBy], references: [id], onDelete: Restrict)
+  taxReview     TaxConfigurationReview? @relation(fields: [taxReviewId], references: [id], onDelete: Restrict)
+  lines         SalesInvoiceLine[]
+
+  @@unique([organizationId, postOperationId])
+  @@unique([organizationId, documentType, documentNumber])
+  @@unique([id, organizationId])
+  @@index([organizationId, invoiceDate(sort: Desc)])
+  @@index([organizationId, customerId])
+  @@map("sales_invoices")
+}
+
+/// One line of a posted invoice: every printed fact is a snapshot; the product, tax category and rate keys are kept for traceability only.
+model SalesInvoiceLine {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId          String    @map("invoice_id") @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  lineNo             Int       @map("line_no")
+  productId          String    @map("product_id") @db.Uuid
+  sku                String
+  productName        String    @map("product_name")
+  itemKind           String    @map("item_kind")
+  hsnSacCode         String?   @map("hsn_sac_code") @db.VarChar(8)
+  hsnSacKind         String?   @map("hsn_sac_kind") @db.VarChar(3)
+  unitCode           String    @map("unit_code")
+  unitName           String    @map("unit_name")
+  taxCategoryId      String    @map("tax_category_id") @db.Uuid
+  taxCategoryCode    String    @map("tax_category_code")
+  taxCategoryName    String    @map("tax_category_name")
+  classification     String
+  taxRateId          String    @map("tax_rate_id") @db.Uuid
+  ratePercent        Decimal   @map("rate_percent") @db.Decimal(7, 4)
+  rateEffectiveFrom  DateTime  @map("rate_effective_from") @db.Date
+  rateEffectiveTo    DateTime? @map("rate_effective_to") @db.Date
+  quantity           Decimal   @db.Decimal(18, 4)
+  unitPrice          Decimal   @map("unit_price") @db.Decimal(18, 2)
+  priceBasis         String    @map("price_basis")
+  grossAmount        Decimal   @map("gross_amount") @db.Decimal(18, 2)
+  discountType       String    @map("discount_type")
+  discountPercent    Decimal?  @map("discount_percent") @db.Decimal(7, 4)
+  discountAmount     Decimal   @map("discount_amount") @db.Decimal(18, 2)
+  taxableValue       Decimal   @map("taxable_value") @db.Decimal(18, 2)
+  cgstRate           Decimal?  @map("cgst_rate") @db.Decimal(8, 5)
+  cgstAmount         Decimal   @default(0) @map("cgst_amount") @db.Decimal(18, 2)
+  sgstRate           Decimal?  @map("sgst_rate") @db.Decimal(8, 5)
+  sgstAmount         Decimal   @default(0) @map("sgst_amount") @db.Decimal(18, 2)
+  utgstRate          Decimal?  @map("utgst_rate") @db.Decimal(8, 5)
+  utgstAmount        Decimal   @default(0) @map("utgst_amount") @db.Decimal(18, 2)
+  igstRate           Decimal?  @map("igst_rate") @db.Decimal(8, 5)
+  igstAmount         Decimal   @default(0) @map("igst_amount") @db.Decimal(18, 2)
+  roundingAdjustment Decimal   @default(0) @map("rounding_adjustment") @db.Decimal(18, 2)
+  lineTotal          Decimal   @map("line_total") @db.Decimal(18, 2)
+  /// DISPATCH (a matching SALES_DISPATCH movement exists) or NONE (untracked goods, and EVERY line of a demo invoice).
+  stockEffect        String    @map("stock_effect")
+
+  invoice     SalesInvoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  taxCategory TaxCategory  @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
+  taxRate     TaxRate      @relation(fields: [taxRateId], references: [id], onDelete: Restrict)
+
+  @@unique([invoiceId, lineNo])
+  @@index([organizationId, productId])
+  @@map("sales_invoice_lines")
 }
 
 // ---------------------------------------------------------------------------

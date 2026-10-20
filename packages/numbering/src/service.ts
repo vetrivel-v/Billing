@@ -676,11 +676,13 @@ export interface SetupNumberingInput {
   debitNotePrefix?: string;
   purchasePrefix?: string;
   paymentPrefix?: string;
+  demoInvoicePrefix?: string;
   numericWidth?: number;
 }
 
 export const SETUP_PREFIX_FIELDS = {
   invoicePrefix: 'INVOICE',
+  demoInvoicePrefix: 'DEMO_INVOICE',
   creditNotePrefix: 'CREDIT_NOTE',
   debitNotePrefix: 'DEBIT_NOTE',
   purchasePrefix: 'PURCHASE_ORDER',

@@ -39,6 +39,8 @@ export interface ApiErrorBody {
     correlationId: string;
     /** Optional field-level problems (field path + rule code only; never submitted values). */
     problems?: { field: string; rule: string }[];
+    /** Optional structured, value-free details for a specific code (for example a fresh calculation after CALCULATION_STALE). */
+    details?: Record<string, unknown>;
   };
 }
 
@@ -209,7 +211,11 @@ export interface HsnSacSearchResponse {
 // -------------------------------------------------------------------------------------------------- inventory
 
 export type StockMovementType =
-  'OPENING_STOCK' | 'STOCK_RECEIPT' | 'ADJUSTMENT_INCREASE' | 'ADJUSTMENT_DECREASE';
+  | 'OPENING_STOCK'
+  | 'STOCK_RECEIPT'
+  | 'ADJUSTMENT_INCREASE'
+  | 'ADJUSTMENT_DECREASE'
+  | 'SALES_DISPATCH';
 export type AdjustmentReasonCode = 'COUNT_CORRECTION' | 'FOUND' | 'DAMAGE' | 'LOSS' | 'OTHER';
 
 /** Quantities are exact decimal STRINGS ("2.5", "10") - never JSON numbers. There is no cost or value anywhere here. */
@@ -373,4 +379,199 @@ export interface HsnSacListResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+// -------------------------------------------------------------------------------------------------- invoices
+
+export type InvoiceMode = 'DEMO' | 'PRODUCTION';
+export type InvoiceDiscountInput =
+  { type: 'NONE' } | { type: 'PERCENT'; percent: string } | { type: 'AMOUNT'; amount: string };
+
+/** The calculation a user was shown. Posting carries it back so the server can refuse a calculation that changed. */
+export interface InvoiceCalculationIdentity {
+  inputHash: string;
+  configurationFingerprint: string;
+  grandTotal: string;
+}
+
+export interface InvoiceProblem {
+  code: string;
+  path?: string;
+  lineRef?: string;
+}
+
+export interface InvoiceStockWarning {
+  lineRefs: string[];
+  productId: string;
+  sku: string;
+  required: string;
+  onHand: string;
+  sufficient: boolean;
+  /** true for a DEMO invoice: what the real stock impact WOULD have been (a demo invoice never changes stock). */
+  advisoryOnly: boolean;
+}
+
+export interface InvoicePreviewResponse {
+  ok: boolean;
+  /** True only when the calculation succeeded and nothing (such as an unconfirmed place of supply) blocks posting. */
+  postable: boolean;
+  mode: InvoiceMode;
+  errors: InvoiceProblem[];
+  warnings: InvoiceProblem[];
+  /** The TaxEngine result (lines, totals, explanations). Null when the request could not be calculated at all. */
+  calculation: Record<string, unknown> | null;
+  identity: InvoiceCalculationIdentity | null;
+  placeOfSupply: {
+    suggestedStateCode: string | null;
+    /** Billing and delivery states differ: the user must choose explicitly (OVERRIDE). */
+    requiresExplicitChoice: boolean;
+  };
+  stockWarnings: InvoiceStockWarning[];
+}
+
+export interface InvoiceLineView {
+  id: string;
+  lineNo: number;
+  productId: string;
+  sku: string;
+  productName: string;
+  itemKind: string;
+  hsnSacCode: string | null;
+  hsnSacKind: string | null;
+  unitCode: string;
+  unitName: string;
+  taxCategoryCode: string;
+  taxCategoryName: string;
+  classification: string;
+  ratePercent: string;
+  rateEffectiveFrom: string;
+  rateEffectiveTo: string | null;
+  quantity: string;
+  unitPrice: string;
+  priceBasis: string;
+  grossAmount: string;
+  discountType: string;
+  discountPercent: string | null;
+  discountAmount: string;
+  taxableValue: string;
+  cgstRate: string | null;
+  cgstAmount: string;
+  sgstRate: string | null;
+  sgstAmount: string;
+  utgstRate: string | null;
+  utgstAmount: string;
+  igstRate: string | null;
+  igstAmount: string;
+  roundingAdjustment: string;
+  lineTotal: string;
+  stockEffect: 'DISPATCH' | 'NONE';
+}
+
+export interface InvoiceReceivableView {
+  allocated: string;
+  balanceDue: string;
+}
+
+export interface InvoiceView {
+  id: string;
+  status: 'POSTED';
+  documentType: 'INVOICE' | 'DEMO_INVOICE';
+  documentNumber: string;
+  isDemo: boolean;
+  invoiceDate: string;
+  financialYearLabel: string;
+  currency: string;
+  warehouseName: string;
+  seller: {
+    legalName: string;
+    tradeName: string | null;
+    gstin: string;
+    gstStatus: string;
+    stateCode: string;
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string | null;
+    pinCode: string | null;
+  };
+  customer: {
+    id: string;
+    code: string;
+    name: string;
+    gstStatus: string;
+    gstin: string | null;
+    billing: {
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string | null;
+      stateCode: string;
+      pinCode: string | null;
+    };
+    shipping: {
+      addressLine1: string;
+      addressLine2: string | null;
+      city: string | null;
+      stateCode: string;
+      pinCode: string | null;
+    };
+    recipientClass: 'B2B' | 'B2C';
+  };
+  placeOfSupply: {
+    stateCode: string;
+    source: 'USER_CONFIRMED' | 'USER_OVERRIDE';
+    confirmedByName: string;
+    confirmedAt: string;
+  };
+  priceBasis: string;
+  tax: {
+    engineVersion: string;
+    rulesetVersion: string;
+    roundingPolicyId: string;
+    inputHash: string;
+    configurationFingerprint: string;
+    taxReviewId: string | null;
+    calculation: Record<string, unknown>;
+  };
+  totals: {
+    grossSubtotal: string;
+    lineDiscountTotal: string;
+    taxableSubtotal: string;
+    cgst: string;
+    sgst: string;
+    utgst: string;
+    igst: string;
+    roundingAdjustmentTotal: string;
+    roundOff: string;
+    grandTotal: string;
+  };
+  /** Production invoices: balance due = grand total (no payments before Task 1.16). Demo invoices: null. */
+  receivable: InvoiceReceivableView | null;
+  lines: InvoiceLineView[];
+  createdAt: string;
+  createdByName: string;
+}
+
+export interface InvoiceSummaryView {
+  id: string;
+  documentNumber: string;
+  isDemo: boolean;
+  invoiceDate: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  grandTotal: string;
+  receivable: InvoiceReceivableView | null;
+  createdAt: string;
+}
+
+export interface InvoiceListResponse {
+  invoices: InvoiceSummaryView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface InvoicePostResponse {
+  invoice: InvoiceView;
+  /** True when this exact operation had already been posted: the original invoice is returned and nothing changed. */
+  replayed: boolean;
 }

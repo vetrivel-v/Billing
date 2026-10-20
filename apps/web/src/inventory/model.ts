@@ -90,6 +90,7 @@ export const MOVEMENT_LABEL: Record<StockMovementType, string> = {
   STOCK_RECEIPT: 'Manual receipt',
   ADJUSTMENT_INCREASE: 'Adjustment (increase)',
   ADJUSTMENT_DECREASE: 'Adjustment (decrease)',
+  SALES_DISPATCH: 'Sales dispatch',
 };
 
 export const REASON_LABEL: Record<AdjustmentReasonCode, string> = {

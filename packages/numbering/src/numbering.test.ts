@@ -27,7 +27,14 @@ const rules = (c: SequenceConfig) => validateSequenceConfig(c).map((p) => `${p.f
 describe('document type registry', () => {
   it('uses stable upper-case machine codes, distinct from display labels', () => {
     expect(DOCUMENT_TYPE_CODES.sort()).toEqual(
-      ['CREDIT_NOTE', 'DEBIT_NOTE', 'INVOICE', 'PAYMENT_RECEIPT', 'PURCHASE_ORDER'].sort(),
+      [
+        'CREDIT_NOTE',
+        'DEBIT_NOTE',
+        'DEMO_INVOICE',
+        'INVOICE',
+        'PAYMENT_RECEIPT',
+        'PURCHASE_ORDER',
+      ].sort(),
     );
     for (const code of DOCUMENT_TYPE_CODES) {
       expect(code).toMatch(/^[A-Z][A-Z0-9_]*$/);

@@ -15,6 +15,15 @@ export interface DocumentTypeDef {
 
 export const DOCUMENT_TYPES = {
   INVOICE: { code: 'INVOICE', label: 'Tax invoice', defaultPrefix: 'INV/{FY}/' },
+  /**
+   * Demo invoices (Task 1.13): a separate sequence with a visibly different prefix, so a demo invoice never consumes the
+   * production INVOICE sequence and can never be mistaken for a tax invoice.
+   */
+  DEMO_INVOICE: {
+    code: 'DEMO_INVOICE',
+    label: 'Demo invoice (not a tax invoice)',
+    defaultPrefix: 'DEMO/{FY}/',
+  },
   CREDIT_NOTE: { code: 'CREDIT_NOTE', label: 'Credit note', defaultPrefix: 'CN/{FY}/' },
   DEBIT_NOTE: { code: 'DEBIT_NOTE', label: 'Debit note', defaultPrefix: 'DN/{FY}/' },
   PURCHASE_ORDER: { code: 'PURCHASE_ORDER', label: 'Purchase order', defaultPrefix: 'PO/{FY}/' },

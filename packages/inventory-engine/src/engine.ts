@@ -22,6 +22,7 @@ export const MOVEMENT_TYPES = [
   'STOCK_RECEIPT',
   'ADJUSTMENT_INCREASE',
   'ADJUSTMENT_DECREASE',
+  'SALES_DISPATCH',
 ] as const;
 export type MovementType = (typeof MOVEMENT_TYPES)[number];
 
@@ -31,6 +32,7 @@ const SIGN: Record<MovementType, 1 | -1> = {
   STOCK_RECEIPT: 1,
   ADJUSTMENT_INCREASE: 1,
   ADJUSTMENT_DECREASE: -1,
+  SALES_DISPATCH: -1,
 };
 
 export type StockErrorCode =

@@ -125,7 +125,7 @@ describe('first-run setup wizard against the real API', () => {
     expect(await fx.prisma.businessLocation.count()).toBe(1);
     expect(await fx.prisma.warehouse.count()).toBe(1);
     expect(await fx.prisma.financialYear.count()).toBe(1);
-    expect(await fx.prisma.documentSequence.count()).toBe(5);
+    expect(await fx.prisma.documentSequence.count()).toBe(6);
     const invoice = await fx.prisma.documentSequence.findFirstOrThrow({
       where: { documentType: 'INVOICE' },
     });
