@@ -13,6 +13,7 @@
     "@commercebill/auth": "^0.0.1",
     "@commercebill/customers": "^0.0.1",
     "@commercebill/database": "^0.0.1",
+    "@commercebill/inventory-engine": "^0.0.1",
     "@commercebill/products": "^0.0.1",
     "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",

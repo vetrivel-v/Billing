@@ -32,7 +32,7 @@ export const MODULES: readonly NavModule[] = [
     label: 'Inventory',
     path: '/inventory',
     permission: 'inventory.stock.read',
-    available: false,
+    available: true,
   },
   {
     key: 'billing',

@@ -58,6 +58,8 @@ model Organization {
   customerCodeCounter       CustomerCodeCounter?
   products                  Product[]
   productCodeCounter        ProductCodeCounter?
+  stockMovements            StockMovement[]
+  stockBalances             StockBalance[]
   users                     User[]
   roles                     Role[]
   documentSequences         DocumentSequence[]
@@ -147,8 +149,10 @@ model Warehouse {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   version        Int      @default(1)
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  location     BusinessLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  location       BusinessLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+  stockBalances  StockBalance[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -177,10 +181,11 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   version            Int       @default(1)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  roles        UserRole[]
-  sessions     Session[]
-  auditLogs    AuditLog[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roles          UserRole[]
+  sessions       Session[]
+  auditLogs      AuditLog[]
+  stockMovements StockMovement[]
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -512,10 +517,12 @@ model Product {
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   version          Int      @default(1)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  hsnSacCode   HsnSacCode?  @relation(fields: [hsnSacCodeId], references: [id], onDelete: Restrict)
-  unit         Unit?        @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  taxCategory  TaxCategory  @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  hsnSacCode     HsnSacCode?     @relation(fields: [hsnSacCodeId], references: [id], onDelete: Restrict)
+  unit           Unit?           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  taxCategory    TaxCategory     @relation(fields: [taxCategoryId], references: [id], onDelete: Restrict)
+  stockMovements StockMovement[]
+  stockBalances  StockBalance[]
 
   // A barcode is unique per organization when present (partial unique index in the migration).
   @@unique([organizationId, sku])
@@ -533,6 +540,69 @@ model ProductCodeCounter {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@map("product_code_counters")
+}
+
+// ---------------------------------------------------------------------------
+// Inventory (Task 1.11, ADR-0022)
+// ---------------------------------------------------------------------------
+
+/// The append-only stock ledger: the ONLY source of stock truth (physical QUANTITY only - no cost or value). One row per
+/// physical change, with a signed `quantityDelta` (numeric(18,4), exact; never a JavaScript number). Rows are immutable:
+/// database triggers refuse UPDATE, DELETE and TRUNCATE, so a correction is a new compensating row. `movementType` is a
+/// text column guarded by a CHECK so later tasks widen the list in a migration (sales dispatch, returns, transfers...).
+/// `(organizationId, sourceType, sourceRef, sourceLineRef)` is the idempotency identity: the same logical event can never
+/// post twice. Manual operations use sourceType MANUAL with the client's operation id as sourceRef.
+model StockMovement {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  /// The sellable-item identity (ADR-0021).
+  productId      String   @map("product_id") @db.Uuid
+  movementType   String   @map("movement_type")
+  quantityDelta  Decimal  @map("quantity_delta") @db.Decimal(18, 4)
+  /// The business date of the stock event (the day it physically happened).
+  businessDate   DateTime @map("business_date") @db.Date
+  sourceType     String   @map("source_type")
+  sourceRef      String   @map("source_ref")
+  sourceLineRef  String   @default("") @map("source_line_ref")
+  /// Adjustments only: COUNT_CORRECTION | FOUND | DAMAGE | LOSS | OTHER.
+  reasonCode     String?  @map("reason_code")
+  /// Free-text document reference (for example a delivery challan number). Never written to audit rows or logs.
+  reference      String?
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdBy      String   @map("created_by") @db.Uuid
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse     Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdByUser User         @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, sourceType, sourceRef, sourceLineRef])
+  @@index([organizationId, productId, createdAt(sort: Desc)])
+  @@index([organizationId, warehouseId, productId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("stock_movements")
+}
+
+/// Stock on hand per (warehouse, product): a PROJECTION of the ledger, maintained by a database trigger in the same
+/// statement as the movement insert, under that row's lock. It is never written by the application directly (a trigger
+/// refuses any write that does not come from the ledger trigger) and can be reconciled against the ledger at any time.
+/// CHECK quantity_on_hand >= 0 is the no-negative-stock policy (a later setting may relax it by migration).
+model StockBalance {
+  organizationId String   @map("organization_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  quantityOnHand Decimal  @map("quantity_on_hand") @db.Decimal(18, 4)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([warehouseId, productId])
+  @@index([organizationId, productId])
+  @@map("stock_balances")
 }
 
 // ---------------------------------------------------------------------------

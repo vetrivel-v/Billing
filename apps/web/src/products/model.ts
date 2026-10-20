@@ -100,6 +100,9 @@ const RULE_TEXT: Record<string, string> = {
   service_cannot_track_inventory: 'A service cannot track inventory.',
   duplicate_sku: 'This SKU is already in use.',
   duplicate_barcode: 'Another product already uses this barcode.',
+  unit_has_stock_history: 'This product already has stock recorded, so its unit cannot be changed.',
+  tracking_has_stock_history:
+    'This product already has stock recorded, so inventory tracking cannot be turned off.',
   kind_cannot_change: 'The product type cannot be changed after the product is created.',
   unknown_field: 'This value is not accepted.',
 };

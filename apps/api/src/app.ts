@@ -17,7 +17,9 @@ import type { AppEnv } from '@commercebill/validation';
 import { registerAuthRoutes, type LoginRateLimit } from './auth-routes.js';
 import { registerUserRoutes } from './user-routes.js';
 import { registerCustomerRoutes } from './customer-routes.js';
+import { registerInventoryRoutes } from './inventory-routes.js';
 import { registerProductRoutes } from './product-routes.js';
+import { createInventoryService } from '@commercebill/inventory-engine';
 import { createProductService } from '@commercebill/products';
 import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
@@ -231,6 +233,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     await registerProductRoutes(
       app,
       createProductService({
+        prisma: deps.prisma,
+        appVersion: APP_VERSION,
+        ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      }),
+    );
+    await registerInventoryRoutes(
+      app,
+      createInventoryService({
         prisma: deps.prisma,
         appVersion: APP_VERSION,
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),

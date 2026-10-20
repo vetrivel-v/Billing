@@ -148,9 +148,7 @@ export function ProductFormPage() {
       if (creating) {
         const { product: made } = await authed((t) => createProduct(t, body));
         await queryClient.invalidateQueries({ queryKey: ['products'] });
-        const stock = made.trackInventory
-          ? ' Stock can be added from Inventory once that module is available.'
-          : '';
+        const stock = made.trackInventory ? ' Stock can be added from Inventory.' : '';
         navigate('/products', {
           state: { notice: `Product ${made.sku} (${made.name}) was created.${stock}` },
         });
@@ -602,7 +600,7 @@ export function ProductFormPage() {
             <div className={wide}>
               <Checkbox
                 label="Track inventory"
-                description="Stock quantities are not entered here: they will be managed from Inventory once that module is available."
+                description="Stock quantities are not entered here: record them from Inventory."
                 checked={form.trackInventory}
                 disabled={readOnly || saving}
                 onChange={(e) => set({ trackInventory: e.target.checked })}

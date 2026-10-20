@@ -205,3 +205,71 @@ export interface HsnSacSearchResponse {
   codes: { id: string; code: string; kind: 'HSN' | 'SAC'; description: string | null }[];
   total: number;
 }
+
+// -------------------------------------------------------------------------------------------------- inventory
+
+export type StockMovementType =
+  'OPENING_STOCK' | 'STOCK_RECEIPT' | 'ADJUSTMENT_INCREASE' | 'ADJUSTMENT_DECREASE';
+export type AdjustmentReasonCode = 'COUNT_CORRECTION' | 'FOUND' | 'DAMAGE' | 'LOSS' | 'OTHER';
+
+/** Quantities are exact decimal STRINGS ("2.5", "10") - never JSON numbers. There is no cost or value anywhere here. */
+export interface WarehouseView {
+  id: string;
+  code: string;
+  name: string;
+  isPrimary: boolean;
+  isActive: boolean;
+}
+
+export interface StockRowView {
+  productId: string;
+  sku: string;
+  name: string;
+  isActive: boolean;
+  unit: { code: string; name: string; decimalPlaces: number };
+  /** Stock on hand in the listed warehouse ("0" when nothing was ever recorded). */
+  onHand: string;
+  /** Whether any movement exists: opening stock is only possible while this is false. */
+  hasMovements: boolean;
+}
+
+export interface StockListResponse {
+  warehouse: { id: string; code: string; name: string } | null;
+  stock: StockRowView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface StockMovementView {
+  id: string;
+  productId: string;
+  productSku: string;
+  productName: string;
+  unit: { code: string; decimalPlaces: number };
+  warehouseId: string;
+  warehouseName: string;
+  movementType: StockMovementType;
+  /** Signed: positive adds stock, negative removes it. */
+  quantityDelta: string;
+  businessDate: string;
+  reasonCode: AdjustmentReasonCode | null;
+  reference: string | null;
+  note: string | null;
+  createdAt: string;
+  createdByName: string;
+}
+
+export interface StockMovementListResponse {
+  movements: StockMovementView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Result of a stock operation. `replayed` means the same operation had already been recorded and nothing changed. */
+export interface StockOperationResponse {
+  movement: StockMovementView;
+  onHand: string;
+  replayed: boolean;
+}

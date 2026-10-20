@@ -9,6 +9,9 @@ import type {
   CustomerView,
   HsnSacSearchResponse,
   ProductListResponse,
+  StockListResponse,
+  StockMovementListResponse,
+  StockOperationResponse,
   ProductReferencesResponse,
   ProductView,
   SetupCompleteResponse,
@@ -283,3 +286,47 @@ export function searchHsnSac(
   if (q.search) params.set('search', q.search);
   return callApi('GET', `/products/references/hsn-sac?${params.toString()}`, { token });
 }
+
+// ---------------------------------------------------------------------------------------------- inventory
+
+export interface StockQuery {
+  search?: string;
+  isActive?: boolean;
+  productId?: string;
+  limit: number;
+  offset: number;
+}
+
+export function listStock(token: string, q: StockQuery): Promise<StockListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
+  if (q.productId) params.set('productId', q.productId);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/inventory/stock?${params.toString()}`, { token });
+}
+
+export function listStockMovements(
+  token: string,
+  q: { productId?: string; limit: number; offset: number },
+): Promise<StockMovementListResponse> {
+  const params = new URLSearchParams();
+  if (q.productId) params.set('productId', q.productId);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/inventory/movements?${params.toString()}`, { token });
+}
+
+export type StockOperation = 'opening' | 'receive' | 'adjust';
+const OPERATION_PATH: Record<StockOperation, string> = {
+  opening: '/inventory/opening-stock',
+  receive: '/inventory/receipts',
+  adjust: '/inventory/adjustments',
+};
+
+export const postStockOperation = (
+  token: string,
+  operation: StockOperation,
+  body: Record<string, unknown>,
+): Promise<StockOperationResponse> => callApi('POST', OPERATION_PATH[operation], { token, body });

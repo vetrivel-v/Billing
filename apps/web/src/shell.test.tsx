@@ -540,7 +540,7 @@ describe('permission-driven navigation', () => {
     for (const label of ['Customers', 'Products', 'Inventory', 'Billing', 'Settings']) {
       expect(nav.textContent).toContain(label);
     }
-    expect(within(nav).getAllByText('Coming soon')).toHaveLength(3); // Customers and Products are built; the rest are still to come
+    expect(within(nav).getAllByText('Coming soon')).toHaveLength(2); // Customers, Products and Inventory are built; Billing and Settings are still to come
   });
 
   it('a typed path without permission says so; with permission says Coming soon; unknown is not found', async () => {

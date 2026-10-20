@@ -170,6 +170,21 @@ cleared or changed). Existing violating rows make the migration abort atomically
 - New table `product_code_counters` (one row per organization, `last_number >= 0`) behind generated SKUs, advanced under a row lock inside the creating transaction.
 - Existing tables and rows are untouched (tested against a populated Task 1.9 database).
 
+### 3.8 Changes in migration `20261024000000_task_1_11_inventory` (Task 1.11)
+
+- New table `stock_movements` (the append-only stock ledger; ADR-0022): internal UUID id; `organization_id`, `warehouse_id`, `product_id` (FKs, restrict); `movement_type`
+  (OPENING_STOCK | STOCK_RECEIPT | ADJUSTMENT_INCREASE | ADJUSTMENT_DECREASE; a CHECK, widened by later migrations); `quantity_delta` `numeric(18,4)` (signed, never zero; the sign is tied to the
+  type by a CHECK); `business_date`; `source_type`, `source_ref`, `source_line_ref` (the idempotency identity, UNIQUE per organization); `reason_code` (adjustments only, a CHECK list);
+  `reference` and `note` (free text, length-checked); `created_at`, `created_by` (FK to users). Indexes: `(organization_id, product_id, created_at desc)`, `(organization_id, warehouse_id, product_id)`,
+  `(organization_id, created_at desc)`. Triggers: `stock_movements_check` (BEFORE INSERT: takes a per-(warehouse, product) advisory lock; product and warehouse must belong to the movement's organization; only GOODS with
+  `track_inventory`; quantity within the unit's `decimal_places`; opening stock only before any other movement), `stock_movements_no_change` and `stock_movements_no_truncate` (the ledger is append-only),
+  `stock_movements_apply` (AFTER INSERT: updates the balance in the same transaction).
+- New table `stock_balances` (a projection of the ledger): primary key `(warehouse_id, product_id)`; `organization_id`; `quantity_on_hand` `numeric(18,4)` with CHECK `>= 0` (the no-negative-stock policy);
+  `updated_at`. Trigger `stock_balances_protect` refuses any INSERT/UPDATE/DELETE that does not come from the ledger trigger (`pg_trigger_depth() < 2`) and `stock_balances_no_truncate` refuses TRUNCATE.
+  `reconcileBalances()` compares it with the ledger.
+- New trigger `products_protect_stock_history` on `products`: a product with stock movements keeps its `unit_id` and cannot stop tracking inventory.
+- No cost, price, value or valuation column anywhere. Existing tables and rows are untouched (tested against a populated Task 1.10 database).
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

@@ -5,6 +5,9 @@ import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
+import { InventoryPage } from './inventory/InventoryPage.js';
+import { InventoryProductPage } from './inventory/InventoryProductPage.js';
+import { StockOperationPage } from './inventory/StockOperationPage.js';
 import { LoginPage } from './LoginPage.js';
 import { ProductFormPage } from './products/ProductFormPage.js';
 import { ProductsPage } from './products/ProductsPage.js';
@@ -105,8 +108,36 @@ function Shell() {
             </Guarded>
           }
         />
+        <Route
+          path="/inventory"
+          element={
+            <Guarded module="inventory">
+              <InventoryPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/inventory/:productId"
+          element={
+            <Guarded module="inventory">
+              <InventoryProductPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/inventory/:productId/:action"
+          element={
+            <Guarded module="inventory">
+              <StockOperationPage />
+            </Guarded>
+          }
+        />
         {MODULES.filter(
-          (m) => m.key !== 'dashboard' && m.key !== 'customers' && m.key !== 'products',
+          (m) =>
+            m.key !== 'dashboard' &&
+            m.key !== 'customers' &&
+            m.key !== 'products' &&
+            m.key !== 'inventory',
         ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />
         ))}

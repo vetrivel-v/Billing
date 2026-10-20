@@ -336,6 +336,27 @@ export function createProductService(options: ProductServiceOptions) {
     }
   }
 
+  /**
+   * A product with stock movements keeps its unit and keeps tracking inventory (Task 1.11): changing either would
+   * change the meaning of, or hide, quantities already recorded. The database enforces the same rule by trigger.
+   */
+  async function assertStockHistoryKept(
+    tx: Prisma.TransactionClient,
+    id: string,
+    current: { unitId: string | null; trackInventory: boolean },
+    v: NormalizedProduct,
+  ): Promise<void> {
+    const unitChanged = v.unitId !== current.unitId;
+    const untracked = current.trackInventory && !v.trackInventory;
+    if (!unitChanged && !untracked) return;
+    if (!(await tx.stockMovement.findFirst({ where: { productId: id }, select: { id: true } })))
+      return;
+    throw new ProductError('validation_failed', 'The product details are not valid.', [
+      ...(unitChanged ? [{ field: 'unitId', rule: 'unit_has_stock_history' }] : []),
+      ...(untracked ? [{ field: 'trackInventory', rule: 'tracking_has_stock_history' }] : []),
+    ]);
+  }
+
   /** A unique violation raised by a concurrent writer after our pre-checks. */
   function mapUniqueViolation(err: unknown): never {
     const e = err as { code?: string; message?: string };
@@ -421,6 +442,7 @@ export function createProductService(options: ProductServiceOptions) {
         const { value } = validated({ ...flat(current), ...patch }, false);
         await checkReferences(tx, ctx.organizationId, value, current);
         await assertBarcodeFree(tx, ctx.organizationId, value.barcode, id);
+        await assertStockHistoryKept(tx, id, current, value);
 
         const next = dataOf(value) as Record<string, unknown>;
         const before = flat(current);
