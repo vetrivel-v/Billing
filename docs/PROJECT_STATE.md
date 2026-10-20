@@ -1,15 +1,15 @@
 # Project State
 
-Last updated: 2026-10-20 (after Phase 1 Task 1.13). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-20 (after Phase 1 Task 1.14). This file and the repository are the implementation record (spec section 44).
 
 | Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Application version       | 0.0.1 (pre-release)                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Current phase             | **Phase 1 in progress: Tasks 1.0-1.13 complete; Task 1.14 not started**                                                                                                                                                                                                                                                                                                                                              |
+| Current phase             | **Phase 1 in progress: Tasks 1.0-1.14 complete; Task 1.15 not started**                                                                                                                                                                                                                                                                                                                                              |
 | Current database version  | `20261026000000_task_1_13_sales_invoices` (28 tables: Task 1.13 added `sales_invoices` and `sales_invoice_lines`)                                                                                                                                                                                                                                                                                                    |
 | Last successful migration | `20261026000000_task_1_13_sales_invoices` - applied to clean databases by every integration file and to a populated Task 1.12 database by its migration test, 2026-10-20                                                                                                                                                                                                                                             |
 | Last successful build     | 2026-10-20 - `npm run build` (api, web, desktop) PASS                                                                                                                                                                                                                                                                                                                                                                |
-| Last successful test run  | 2026-10-20 - `npm run verify:phase0` all 8 gates PASS; 1097 tests passed (531 unit + 566 integration); coverage 95.2% statements / 90.5% branches / 96.2% functions / 96.6% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                                                                                                                    |
+| Last successful test run  | 2026-10-20 - `npm run verify:phase0` all 8 gates PASS; 1118 tests passed in 70 files; coverage 94.5% statements / 89.7% branches / 94.5% functions / 95.9% lines (thresholds 80/70/80/80 unchanged); npm audit 0 vulnerabilities                                                                                                                                                                                     |
 | Git                       | Branch `main`; Phase 0 = `40bfecd`; Task 1.0 = `e56bf6d`; governance docs = `8e81d9e`; Task 1.1 = `4bcccdc`; Task 1.2 = `963ebf9`; Task 1.3 = `94bb7e9`; Task 1.4 = `800e2f7`; Task 1.5 = `9dbfd55`; Task 1.6 = `d23ab67`; Task 1.7 = `2ee0a11`; Task 1.8 = `7cdc2a7`; Task 1.9 = `7fb72f3`; Task 1.10 = `9aaf4fa`; Task 1.11 = `a905e97`; Task 1.12 = the commit following it (see `git log`); no remote configured |
 | Release status            | Not releasable. No product functionality exists                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -197,6 +197,19 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
+
+## Task 1.14 results (billing UI; see docs/PHASE_1_TASK_1_14_COMPLETION_REPORT.md)
+
+**Billing is usable end to end in DEMO mode only. R-040 stays open; production billing stays unavailable until Task 1.17.**
+
+- **Billing** appears in the sidebar for `sales.invoice.read` (permission-derived, never from a role name) and opens the **Invoice List** (`GET /invoices`): number, date, customer, taxable value, GST, total, DEMO/Production badge and status; search, type and date filters, server-side paging, loading / empty / no-match / error states.
+- **New invoice** (`sales.invoice.write`): keyboard-first customer and product search (real data), several lines, exact decimal-string quantities checked against the unit, optional percent or fixed line discount, read-only price (no override), services listed but refused with a reason, an unmissable DEMO banner, explicit place-of-supply confirmation (suggestion never auto-confirmed; billing/shipping mismatch needs an explicit pick), server preview with all totals, advisory stock warnings.
+- **Staleness:** any edit after a preview disables Post until previewed again; `CALCULATION_STALE` at post shows the server's new totals and needs a second explicit Post (button becomes "Post with updated totals").
+- **Posting:** one `operationId` per candidate request (reused for double clicks and retries, renewed on any edit); a lost answer shows "Retry posting" with the same entry and resolves to the same invoice and number. Success opens the **Invoice Detail**: an immutable, read-only snapshot with DEMO marking and no edit/delete/cancel controls.
+- **API change (additive):** `InvoiceSummaryView` gained `taxableSubtotal` and `taxTotal` for the list. The web `ApiError` now keeps `details`.
+- **Tests:** 11 real UI -> API -> PostgreSQL tests (navigation/permissions, compose and preview with no business writes, mixed price basis, split places of supply, post + snapshot + stock untouched + reopen, double click, lost response, stale calculation, preview-only user, expired session, log hygiene) and 10 model unit tests; the shell navigation tests follow Billing becoming a real link.
+- **Visual review (real API, fictional data, 1000 and 1280 px):** list, New invoice with three lines and a discount, and the posted DEMO detail were inspected; no horizontal page scroll. The line table overflowed by 5 px at 1000 px and was tightened (shorter discount options, compact remove button).
+- **Not built:** PDF/print, payments, credit notes, drafts, production activation, custom prices, invoice discount, charges.
 
 ## Task 1.13 results (sales invoice domain and posting transaction; see docs/PHASE_1_TASK_1_13_COMPLETION_REPORT.md, ADR-0024)
 
@@ -450,14 +463,13 @@ dashboards, template designer).
 
 ## Exact next task
 
-**Phase 1, Task 1.14 - Billing UI** (needs approval; not started). Acceptance criteria:
+**Phase 1, Task 1.15 - Invoice PDF and printing** (needs approval; not started). Acceptance criteria:
 
-1. A Sales > New invoice screen composes an invoice client-side: pick a customer, add products (search by SKU/name/barcode), quantities (unit decimal places enforced), optional percent/amount line discounts; no draft is saved.
-2. Every change calls `POST /invoices/preview`; the screen shows the server calculation (never computes tax itself), the explanation, warnings, `MIXED_PRICE_BASIS` and other blocking codes in plain language, and the advisory stock warning (labelled advisory for DEMO, blocking for PRODUCTION at post time).
-3. The **place of supply requires an explicit user action** (accept the suggestion, or choose another state); opening or previewing is never a confirmation, and the Post button stays disabled until the user has chosen.
-4. Post sends a fresh `operationId` (kept for retries of the same attempt so a double click or lost response cannot post twice), the explicit `mode`, the confirmed place of supply and the previewed calculation identity; 201 and 200 (replay) both show the invoice; `CALCULATION_STALE` shows the new numbers for re-confirmation; `INSUFFICIENT_STOCK`, `PRODUCTION_GATE_NOT_MET`, `MODE_MISMATCH`, `OPERATION_ID_REUSED` and `NUMBER_SEQUENCE_MISSING` have clear messages.
-5. DEMO mode is unmistakable (banner and a "DEMO - not a tax invoice" mark on every demo screen and number); the mode is shown from the organization setting and is never chosen implicitly.
-6. An invoice list (search, demo filter, date range, paging from the server) and an invoice detail view of the immutable snapshot (seller, customer, lines, tax components, place of supply and who confirmed it); no edit or delete control exists.
-7. Permissions: preview needs `sales.invoice.write`, Post needs `sales.invoice.post`, viewing needs `sales.invoice.read`; controls the user lacks are hidden or disabled.
-8. Tests against the real API (fictional data): composing, preview, post, replay, stale, stock refusal (production-injected world), place-of-supply gating, role visibility; visual review at 1000 px and 1100 px with no horizontal scroll.
-9. Out of scope: PDFs/printing (Task 1.15), payments and receivables (Task 1.16), backup (Task 1.17), credit notes, backdating, services, charges, custom prices.
+1. A "Print / Save as PDF" action on the Invoice Detail renders the immutable invoice snapshot only (never current customer/product master data) to a PDF generated locally; no network service.
+2. The document shows the seller (name, GSTIN, address), customer (billing and shipping, GSTIN if any), invoice number, date, place of supply, lines (HSN/SAC, quantity, unit, rate, discount, taxable value, CGST/SGST/UTGST/IGST with rates), totals and amount in words.
+3. A DEMO invoice is unmistakable on every page ("DEMO - NOT A TAX INVOICE" watermark and heading) and can never be printed looking like a production invoice; a production invoice is never marked demo.
+4. Layout is correct for A4 with multi-page invoices (repeating header, no split rows); the PDF text is selectable.
+5. Printing uses the OS print dialog or a saved file chosen by the user; the file is written only where the user chooses; nothing is stored in the database.
+6. Permission `document.print` is required; the server (not the UI) enforces it if a server route is used; an audit event records that an invoice was printed (facts only).
+7. Tests: golden-text checks of the PDF content for a demo and a (test-seam) production invoice, multi-page case, permission checks, and that a master-data change after posting does not alter the output.
+8. Out of scope: e-invoice/IRN/QR, emailing or WhatsApp sending, payments, credit notes, templates/branding editor.

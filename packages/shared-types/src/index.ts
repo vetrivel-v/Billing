@@ -558,6 +558,9 @@ export interface InvoiceSummaryView {
   customerId: string;
   customerCode: string;
   customerName: string;
+  taxableSubtotal: string;
+  /** CGST + SGST + UTGST + IGST. */
+  taxTotal: string;
   grandTotal: string;
   receivable: InvoiceReceivableView | null;
   createdAt: string;

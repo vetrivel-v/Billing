@@ -705,6 +705,8 @@ export function createInvoiceService(options: InvoiceServiceOptions) {
       customerId: r.customerId,
       customerCode: r.customerCode,
       customerName: r.customerName,
+      taxableSubtotal: money(r.taxableSubtotal),
+      taxTotal: money(r.cgstTotal.plus(r.sgstTotal).plus(r.utgstTotal).plus(r.igstTotal)),
       grandTotal: money(r.grandTotal),
       receivable: r.isDemo ? null : { allocated: '0.00', balanceDue: money(r.grandTotal) },
       createdAt: r.createdAt.toISOString(),

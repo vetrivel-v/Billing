@@ -518,10 +518,10 @@ describe('permission-driven navigation', () => {
     expect(nav.textContent).not.toContain('Inventory');
     expect(nav.textContent).not.toContain('Settings');
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeTruthy();
-    // Customers is a built module now: a real link. Billing is not built yet: disabled "Coming soon", not a link.
+    // Customers and Billing are built modules: real links, nothing here is "Coming soon".
     expect(screen.getByRole('link', { name: 'Customers' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: /Billing/ })).toBeNull();
-    expect(within(nav).getAllByText('Coming soon')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Billing' })).toBeTruthy();
+    expect(within(nav).queryAllByText('Coming soon')).toHaveLength(0);
   });
 
   it('authorises from permissions, never from a role name', async () => {
@@ -540,7 +540,7 @@ describe('permission-driven navigation', () => {
     for (const label of ['Customers', 'Products', 'Inventory', 'Billing', 'Settings']) {
       expect(nav.textContent).toContain(label);
     }
-    expect(within(nav).getAllByText('Coming soon')).toHaveLength(2); // Customers, Products and Inventory are built; Billing and Settings are still to come
+    expect(within(nav).getAllByText('Coming soon')).toHaveLength(1); // only Settings is still to come
   });
 
   it('a typed path without permission says so; with permission says Coming soon; unknown is not found', async () => {
@@ -549,8 +549,8 @@ describe('permission-driven navigation', () => {
     await signIn();
     expect(await screen.findByText('You do not have access to this area')).toBeTruthy();
     cleanup();
-    withPermissions(['sales.invoice.read']);
-    renderApp('/billing');
+    withPermissions(['org.settings.read']);
+    renderApp('/settings');
     await signIn();
     expect(await screen.findByRole('heading', { name: 'Coming soon' })).toBeTruthy();
     cleanup();

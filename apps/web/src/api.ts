@@ -16,6 +16,10 @@ import type {
   TaxReviewListResponse,
   TaxReviewView,
   BillingMode,
+  InvoiceListResponse,
+  InvoicePostResponse,
+  InvoicePreviewResponse,
+  InvoiceView,
   StockListResponse,
   StockMovementListResponse,
   StockOperationResponse,
@@ -46,12 +50,20 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
   readonly problems: { field: string; rule: string }[];
-  constructor(status: number, code?: string, problems: { field: string; rule: string }[] = []) {
+  /** Structured, value-free details some answers carry (a stale calculation's fresh recalculation, unmet gate requirements). */
+  readonly details: Record<string, unknown> | undefined;
+  constructor(
+    status: number,
+    code?: string,
+    problems: { field: string; rule: string }[] = [],
+    details?: Record<string, unknown>,
+  ) {
     super(`API error ${status}${code ? ` ${code}` : ''}`);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.problems = problems;
+    this.details = details;
   }
 }
 
@@ -148,7 +160,12 @@ async function callApi<T>(
   }
   if (!res.ok) {
     const err = (json as Partial<ApiErrorBody> | undefined)?.error;
-    throw new ApiError(res.status, err?.code, Array.isArray(err?.problems) ? err.problems : []);
+    throw new ApiError(
+      res.status,
+      err?.code,
+      Array.isArray(err?.problems) ? err.problems : [],
+      err?.details && typeof err.details === 'object' ? err.details : undefined,
+    );
   }
   return json as T;
 }
@@ -402,3 +419,39 @@ export const reviewHsnEntry = (
     token,
     body: { expectedVersion },
   });
+
+// ---------------------------------------------------------------------------------------------- invoices
+
+export interface InvoiceQuery {
+  search?: string;
+  isDemo?: boolean;
+  from?: string;
+  to?: string;
+  limit: number;
+  offset: number;
+}
+
+export function listInvoices(token: string, q: InvoiceQuery): Promise<InvoiceListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.isDemo !== undefined) params.set('isDemo', String(q.isDemo));
+  if (q.from) params.set('from', q.from);
+  if (q.to) params.set('to', q.to);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/invoices?${params.toString()}`, { token });
+}
+
+export const getInvoice = (token: string, id: string): Promise<{ invoice: InvoiceView }> =>
+  callApi('GET', `/invoices/${encodeURIComponent(id)}`, { token });
+
+/** Writes nothing: the server recalculates from its own facts. */
+export const previewInvoice = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<InvoicePreviewResponse> => callApi('POST', '/invoices/preview', { token, body });
+
+export const postInvoice = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<InvoicePostResponse> => callApi('POST', '/invoices', { token, body });

@@ -5,6 +5,9 @@ import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
+import { InvoiceDetailPage } from './invoices/InvoiceDetailPage.js';
+import { InvoicesPage } from './invoices/InvoicesPage.js';
+import { NewInvoicePage } from './invoices/NewInvoicePage.js';
 import { InventoryPage } from './inventory/InventoryPage.js';
 import { InventoryProductPage } from './inventory/InventoryProductPage.js';
 import { StockOperationPage } from './inventory/StockOperationPage.js';
@@ -150,12 +153,37 @@ function Shell() {
             </Guarded>
           }
         />
+        <Route
+          path="/billing"
+          element={
+            <Guarded module="billing">
+              <InvoicesPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/billing/new"
+          element={
+            <Guarded module="billing">
+              <NewInvoicePage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/billing/:id"
+          element={
+            <Guarded module="billing">
+              <InvoiceDetailPage />
+            </Guarded>
+          }
+        />
         {MODULES.filter(
           (m) =>
             m.key !== 'dashboard' &&
             m.key !== 'customers' &&
             m.key !== 'products' &&
             m.key !== 'inventory' &&
+            m.key !== 'billing' &&
             m.key !== 'tax',
         ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />

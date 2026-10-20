@@ -46,7 +46,7 @@ export const MODULES: readonly NavModule[] = [
     label: 'Billing',
     path: '/billing',
     permission: 'sales.invoice.read',
-    available: false,
+    available: true,
   },
   {
     key: 'settings',
