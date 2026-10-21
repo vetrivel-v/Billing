@@ -17,6 +17,9 @@ interface SmokeResult {
   origin: string;
   title: string;
   bridge: { name: string; version: string; platform: string };
+  bridgeKeys: string[];
+  badSavePayload: string;
+  badPrintPayload: string;
   nodeExposed: boolean;
   secretLength: number;
   baseUrlIsLoopback: boolean;
@@ -98,6 +101,17 @@ describe('Electron shell supplies the launch secret to the API (P1-SEC-01)', () 
     expect(result.origin).toBe('app://commercebill');
     expect(result.nodeExposed).toBe(false);
     expect(result.bridge.name).toBe('CommerceBill Desktop');
+
+    // Task 1.15: the bridge is exactly these four methods (no fs, shell, path or navigation capability), and the document
+    // channels reject an invalid payload from the real renderer (no dialog, no file, no echo).
+    expect(result.bridgeKeys).toEqual([
+      'getApiAccess',
+      'getAppInfo',
+      'printInvoice',
+      'saveInvoicePdf',
+    ]);
+    expect(result.badSavePayload).toBe('rejected');
+    expect(result.badPrintPayload).toBe('rejected');
 
     // Per-launch secret: 32 random bytes hex, delivered with a loopback URL.
     expect(result.secretLength).toBe(64);

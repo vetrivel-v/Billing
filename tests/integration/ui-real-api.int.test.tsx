@@ -87,6 +87,8 @@ beforeEach(() => {
   window.commercebill = {
     getAppInfo: async () => ({ name: 'test', version: '0', platform: 'test' }),
     getApiAccess: async () => ({ baseUrl, secret: LAUNCH_SECRET }),
+    saveInvoicePdf: async () => ({ status: 'cancelled' }),
+    printInvoice: async () => ({ status: 'cancelled' }),
   };
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     const auth = (init?.headers as Record<string, string> | undefined)?.authorization;

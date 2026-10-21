@@ -152,6 +152,8 @@ beforeEach(() => {
   window.commercebill = {
     getAppInfo: async () => ({ name: 'test', version: '0', platform: 'test' }),
     getApiAccess: async () => ({ baseUrl, secret: LAUNCH_SECRET }),
+    saveInvoicePdf: async () => ({ status: 'cancelled' }),
+    printInvoice: async () => ({ status: 'cancelled' }),
   };
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({
@@ -482,6 +484,115 @@ describe('posting a DEMO invoice', () => {
       where: { id: w.products.gst5 },
       data: { sellingPrice: '200.00' },
     });
+  }, 120_000);
+});
+
+describe('printing and saving a posted invoice (Task 1.15)', () => {
+  const bridge = (over: Record<string, unknown> = {}) => {
+    const calls: { save: unknown[]; print: unknown[] } = { save: [], print: [] };
+    window.commercebill = {
+      getAppInfo: async () => ({ name: 'test', version: '0', platform: 'test' }),
+      getApiAccess: async () => ({ baseUrl, secret: LAUNCH_SECRET }),
+      saveInvoicePdf: async (inv: unknown) => {
+        calls.save.push(inv);
+        return { status: 'saved' as const };
+      },
+      printInvoice: async (inv: unknown) => {
+        calls.print.push(inv);
+        return { status: 'cancelled' as const };
+      },
+      ...over,
+    } as never;
+    return calls;
+  };
+
+  it('Preview / Print shows the posted document with the DEMO marking; Print and Save PDF send only the stored snapshot', async () => {
+    const calls = bridge();
+    const inv = await fx.prisma.salesInvoice.findFirstOrThrow({ orderBy: { createdAt: 'asc' } });
+    const lineBefore = await fx.prisma.salesInvoiceLine.findFirstOrThrow({
+      where: { invoiceId: inv.id },
+    });
+    // the master data has moved on since posting
+    await fx.prisma.product.update({
+      where: { id: lineBefore.productId },
+      data: { name: 'Moved On Product', sellingPrice: '777.00' },
+    });
+    renderApp(`/billing/${inv.id}`);
+    await signInAs(users['Administrator']!);
+    await screen.findByRole('heading', { name: `Invoice ${inv.documentNumber}` });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview / Print' }));
+    const frame = (await screen.findByTitle('Invoice preview')) as HTMLIFrameElement;
+    expect(frame.getAttribute('sandbox')).toBe(''); // no scripts, no same-origin access
+    const doc = frame.getAttribute('srcdoc')!;
+    expect(doc).toContain('class="wm"');
+    expect(doc).toContain('NOT A PRODUCTION TAX INVOICE');
+    expect(doc).toContain(inv.documentNumber);
+    expect(doc).not.toContain('Moved On Product');
+    expect(doc).not.toContain('777.00');
+    expect(posts()).toHaveLength(0); // printing posts nothing: no second invoice is needed to print an old one
+
+    fireEvent.click(screen.getByRole('button', { name: /^Print/ }));
+    expect(await screen.findByText('Printing was cancelled.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save PDF' }));
+    expect(await screen.findByText('The PDF was saved.')).toBeTruthy();
+    expect(calls.print).toHaveLength(1);
+    expect(calls.save).toHaveLength(1);
+    const sent = calls.save[0] as {
+      id: string;
+      documentNumber: string;
+      lines: { productName: string; unitPrice: string }[];
+    };
+    expect(sent.id).toBe(inv.id);
+    expect(sent.documentNumber).toBe(inv.documentNumber);
+    expect(sent.lines[0]!.productName).toBe(lineBefore.productName);
+    expect(sent.lines[0]!.unitPrice).not.toBe('777.00');
+    expect(document.body.textContent).not.toMatch(/[A-Z]:\|\/Users\//); // no path is ever shown
+    await fx.prisma.product.update({
+      where: { id: lineBefore.productId },
+      data: { name: lineBefore.productName, sellingPrice: '100.00' },
+    });
+  }, 120_000);
+
+  it('Save PDF from the invoice page works too, and a failure or a cancel is reported plainly', async () => {
+    const answers: ('failed' | 'cancelled')[] = ['failed', 'cancelled'];
+    bridge({ saveInvoicePdf: async () => ({ status: answers.shift() }) });
+    const inv = await fx.prisma.salesInvoice.findFirstOrThrow();
+    renderApp(`/billing/${inv.id}`);
+    await signInAs(users['Administrator']!);
+    await screen.findByRole('heading', { name: `Invoice ${inv.documentNumber}` });
+    fireEvent.click(screen.getByRole('button', { name: 'Save PDF' }));
+    expect(
+      await screen.findByText('The PDF could not be created. No file was saved.'),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save PDF' }));
+    expect(await screen.findByText('Saving was cancelled. No file was written.')).toBeTruthy();
+  }, 120_000);
+
+  it('outside the desktop app the buttons are disabled with an explanation', async () => {
+    window.commercebill = {
+      getAppInfo: async () => ({ name: 't', version: '0', platform: 't' }),
+      getApiAccess: async () => ({ baseUrl, secret: LAUNCH_SECRET }),
+    } as never;
+    const inv = await fx.prisma.salesInvoice.findFirstOrThrow();
+    renderApp(`/billing/${inv.id}/print`);
+    await signInAs(users['Viewer/Auditor']!); // read access is enough to view the document
+    await screen.findByTitle('Invoice preview');
+    expect((screen.getByRole('button', { name: 'Save PDF' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(
+      screen.getByText('Saving and printing are available in the CommerceBill desktop app.'),
+    ).toBeTruthy();
+  }, 120_000);
+
+  it('a user without invoice access cannot reach the document', async () => {
+    bridge();
+    const inv = await fx.prisma.salesInvoice.findFirstOrThrow();
+    await newUser('Warehouse Operator', 'ui.warehouse');
+    renderApp(`/billing/${inv.id}/print`);
+    await signInAs('ui.warehouse');
+    expect(await screen.findByText('You do not have access to this area')).toBeTruthy();
+    expect(screen.queryByTitle('Invoice preview')).toBeNull();
   }, 120_000);
 });
 

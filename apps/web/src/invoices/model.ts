@@ -263,3 +263,30 @@ export const customerContextState = (c: CustomerView) => ({
     ? c.billingStateCode
     : (c.shippingStateCode ?? c.billingStateCode),
 });
+
+// ------------------------------------------------------------------------------------------------ printing and saving
+
+/** Wording for the outcome of a save or print request. The result never contains a path, so none can be shown. */
+export function outputMessage(
+  kind: 'save' | 'print',
+  result: { status: 'saved' | 'printed' | 'cancelled' | 'failed' } | undefined,
+): { tone: 'success' | 'info' | 'error'; text: string } | null {
+  switch (result?.status) {
+    case 'saved':
+      return { tone: 'success', text: 'The PDF was saved.' };
+    case 'printed':
+      return { tone: 'success', text: 'The invoice was sent to the printer.' };
+    case 'cancelled':
+      return kind === 'save'
+        ? { tone: 'info', text: 'Saving was cancelled. No file was written.' }
+        : { tone: 'info', text: 'Printing was cancelled.' };
+    default:
+      return {
+        tone: 'error',
+        text:
+          kind === 'save'
+            ? 'The PDF could not be created. No file was saved.'
+            : 'The invoice could not be printed. Try again.',
+      };
+  }
+}

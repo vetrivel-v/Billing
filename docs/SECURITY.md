@@ -73,3 +73,11 @@ reviewed in the diff.
 - Idempotency by operation id; the same id with different content is refused.
 - Logs and the `invoice.post` audit row carry no customer name, address, GSTIN or search text.
 - Production posting is refused until the Task 1.12 gate is met (needs the Task 1.17 backup/restore fact); the test seam is a default-false dependency.
+
+## Task 1.15 controls (Electron print and save IPC; ADR-0025)
+
+- Two document channels only (`document:save-invoice-pdf`, `document:print-invoice`); the sender frame is checked, then the payload is validated strictly; the HTML is built in the main process (renderer HTML is ignored).
+- The hidden render window runs with JavaScript off, sandbox on, a throw-away session that cancels every request except its own `data:` page, and no navigation or new windows.
+- The destination is chosen only in the operating system save dialog; a `.pdf` extension is enforced; a PDF signature is checked before anything is written. The result never contains a path.
+- Print never runs silently. The preload exposes exactly four methods and no file-system, shell or navigation capability (source guard-rail tests).
+- Logs and diagnostics carry no invoice, customer or tax content. A document needs `sales.invoice.read` (the snapshot is read through the normal API and organization boundary).

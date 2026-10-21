@@ -63,10 +63,28 @@ export interface ApiAccess {
   secret: string;
 }
 
-/** Bridge exposed by the Electron preload script (kept minimal by design; argument-free methods only). */
+/**
+ * The outcome of a print or save request. Deliberately carries no file path: the renderer never learns where a file was written.
+ * `failed` is generic on purpose (no content, no path, no internal message).
+ */
+export interface DocumentOutputResult {
+  status: 'saved' | 'printed' | 'cancelled' | 'failed';
+  /** The default file name suggested to the user for a save (never a path). */
+  fileName?: string;
+}
+
+/**
+ * Bridge exposed by the Electron preload script (kept minimal by design). The only methods with an argument take an already
+ * posted invoice SNAPSHOT: the main process validates it strictly, renders it itself, and decides where anything is written
+ * through the operating system's own dialogs. There is no file-system, shell or navigation access.
+ */
 export interface DesktopBridge {
   getAppInfo(): Promise<{ name: string; version: string; platform: string }>;
   getApiAccess(): Promise<ApiAccess>;
+  /** Renders the invoice to an A4 PDF and asks the user where to save it (a save dialog). */
+  saveInvoicePdf(invoice: InvoiceView): Promise<DocumentOutputResult>;
+  /** Opens the operating system's print dialog for the invoice. Never prints silently. */
+  printInvoice(invoice: InvoiceView): Promise<DocumentOutputResult>;
 }
 
 /** Application version reported by health checks until release tooling injects it (Phase 6). */

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -11,10 +12,17 @@ import {
   shell,
   type IpcMainInvokeEvent,
 } from 'electron';
-import { APP_VERSION, type ApiAccess } from '@commercebill/shared-types';
+import { APP_VERSION, type ApiAccess, type DocumentOutputResult } from '@commercebill/shared-types';
 import { parseEnv } from '@commercebill/validation';
 import { generateLaunchSecret, getFreePort, startApi, type RunningApi } from './api-supervisor.js';
 import { resolveAppRequest } from './app-protocol.js';
+import {
+  DOCUMENT_CHANNELS,
+  looksLikePdf,
+  pdfPageCount,
+  prepareDocumentRequest,
+} from './document-ipc.js';
+import { printInvoice, renderPdf, saveInvoicePdf, setOutputHooks } from './electron-document.js';
 import {
   APP_ORIGIN,
   APP_SCHEME,
@@ -27,6 +35,10 @@ import {
 
 const devServerUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
 const smoke = process.env.ELECTRON_SMOKE === '1' && !app.isPackaged;
+// Verification only: drive the real Billing screens in the real renderer (see runDocumentSmoke).
+const docSmoke = process.env.ELECTRON_DOC_SMOKE === '1' && !app.isPackaged;
+// Verification only: render one invoice snapshot to PDF and exit (no window, no API). See runPdfSmoke.
+const pdfSmoke = !app.isPackaged && Boolean(process.env.ELECTRON_PDF_FIXTURE);
 // Dev layout: apps/desktop/dist -> apps/web/dist and apps/api/dist. Packaged layout is Phase 6 work.
 const webRoot = join(__dirname, '..', '..', 'web', 'dist');
 const apiEntry = join(__dirname, '..', '..', 'api', 'dist', 'main.js');
@@ -60,10 +72,11 @@ function createWindow(): BrowserWindow {
     if (!isAllowedNavigation(url, devServerUrl)) event.preventDefault();
   });
   win.once('ready-to-show', () => {
-    if (!smoke) win.show();
+    if (!smoke && !docSmoke) win.show();
   });
 
   if (smoke) runSmokeCheck(win);
+  if (docSmoke) runDocumentSmoke(win);
 
   void win.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`);
   return win;
@@ -98,6 +111,9 @@ function runSmokeCheck(win: BrowserWindow): void {
             origin: location.origin,
             title: document.title,
             bridge: await window.commercebill.getAppInfo(),
+            bridgeKeys: Object.keys(window.commercebill).sort(),
+            badSavePayload: await window.commercebill.saveInvoicePdf({ not: 'an invoice' }).then(() => 'resolved', () => 'rejected'),
+            badPrintPayload: await window.commercebill.printInvoice('<script>').then(() => 'resolved', () => 'rejected'),
             nodeExposed: typeof require !== 'undefined' || typeof process !== 'undefined',
             secretLength: access.secret.length,
             baseUrlIsLoopback: access.baseUrl.startsWith('http://127.0.0.1:'),
@@ -133,6 +149,88 @@ function runSmokeCheck(win: BrowserWindow): void {
   win.webContents.once('did-fail-load', () => app.exit(1));
 }
 
+/**
+ * Verification only (unpackaged + ELECTRON_DOC_SMOKE=1, test credentials in the environment): production-like check of the
+ * Billing document flow in the REAL renderer served from app://, against the REAL API and database: sign in, open the invoice
+ * list and an invoice, open Preview / Print, then Save PDF and Print through the real IPC. The two native dialogs cannot be
+ * operated by automation, so they are replaced by hooks (save: a file in ELECTRON_SMOKE_SAVE_DIR; print: not shown). The saved
+ * PDF is then checked. No physical printer is involved.
+ */
+function runDocumentSmoke(win: BrowserWindow): void {
+  const saveDir = process.env.ELECTRON_SMOKE_SAVE_DIR ?? '';
+  setOutputHooks({
+    chooseSavePath: async (fileName) => join(saveDir, fileName),
+    skipPrintDialog: true,
+  });
+  win.webContents.once('did-finish-load', () => {
+    void win.webContents
+      .executeJavaScript(
+        String.raw`(async () => {
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          const until = async (fn, what) => {
+            for (let i = 0; i < 300; i++) { const v = fn(); if (v) return v; await sleep(150); }
+            throw new Error('timed out waiting for ' + what + ' | screen: ' + (document.body.innerText || '').slice(0, 160).replace(/\s+/g, ' '));
+          };
+          const byText = (sel, re) => [...document.querySelectorAll(sel)].find((e) => re.test(e.textContent || ''));
+          const setValue = (el, v) => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          };
+          const out = {};
+          await until(() => document.querySelector('h1')?.textContent === 'Sign in', 'the sign-in screen');
+          setValue(document.querySelector('input[autocomplete="username"], input[name="username"], input[type="text"]'), ${JSON.stringify(process.env.ELECTRON_SMOKE_USER ?? '')});
+          setValue(document.querySelector('input[type="password"]'), ${JSON.stringify(process.env.ELECTRON_SMOKE_PASSWORD ?? '')});
+          byText('button', /^Sign in$/).click();
+          const nav = await until(() => byText('nav a', /^Billing$/), 'the Billing link');
+          nav.click();
+          const open = await until(() => document.querySelector('a[aria-label^="Open invoice"]'), 'the invoice list');
+          out.listRows = document.querySelectorAll('tbody tr').length;
+          out.listDemoBadge = /DEMO/.test(document.querySelector('tbody tr')?.textContent || '');
+          open.click();
+          await until(() => /^Invoice /.test(document.querySelector('h1')?.textContent || ''), 'the invoice');
+          out.detailHeading = document.querySelector('h1').textContent;
+          out.detailDemoAlert = /DEMO INVOICE/.test(document.body.textContent || '');
+          out.detailEditControls = [...document.querySelectorAll('button')].filter((b) => /^(Edit|Delete|Cancel invoice)/.test(b.textContent || '')).length;
+          byText('button', /^Preview \/ Print$/).click();
+          const frame = await until(() => document.querySelector('iframe[title="Invoice preview"]'), 'the print preview');
+          const html = frame.getAttribute('srcdoc') || '';
+          out.previewSandbox = frame.getAttribute('sandbox');
+          out.previewWatermark = html.includes('class="wm"') && html.includes('NOT A PRODUCTION TAX INVOICE');
+          out.previewHasNumber = html.includes(out.detailHeading.replace('Invoice ', '').replace('Print preview: ', ''));
+          byText('button', /^Save PDF$/).click();
+          await until(() => /The PDF was saved\.|could not be created|cancelled/.test(document.body.textContent || ''), 'the save result');
+          out.saveMessage = (document.body.textContent || '').match(/The PDF was saved\.|The PDF could not be created[^.]*\.|Saving was cancelled[^.]*\./)?.[0] ?? null;
+          byText('button', /^Print/).click();
+          await until(() => /sent to the printer|could not be printed|Printing was cancelled/.test(document.body.textContent || ''), 'the print result');
+          out.printMessage = (document.body.textContent || '').match(/The invoice was sent to the printer\.|The invoice could not be printed\.[^.]*|Printing was cancelled\./)?.[0] ?? null;
+          out.nodeExposed = typeof require !== 'undefined' || typeof process !== 'undefined';
+          out.bodyShowsPath = /[A-Z]:\\|\/Users\//.test(document.body.textContent || '');
+          return out;
+        })()`,
+      )
+      .then(async (r: Record<string, unknown>) => {
+        const files = readdirSync(saveDir).filter((f) => f.endsWith('.pdf'));
+        const first = files[0] ? readFileSync(join(saveDir, files[0])) : undefined;
+        process.stdout.write(
+          `DOC_SMOKE_RESULT ${JSON.stringify({
+            ...r,
+            savedFiles: files,
+            savedIsPdf: first ? looksLikePdf(first) : false,
+            savedPages: first ? pdfPageCount(first) : 0,
+          })}\n`,
+        );
+        await api?.stop();
+        app.exit(0);
+      })
+      .catch(async (e: unknown) => {
+        process.stderr.write(`DOC_SMOKE_FAILED ${String(e)}\n`);
+        await api?.stop();
+        app.exit(1);
+      });
+  });
+  win.webContents.once('did-fail-load', () => app.exit(1));
+}
+
 function assertTrusted(event: IpcMainInvokeEvent): void {
   if (!isTrustedSender(event.senderFrame?.url, devServerUrl)) {
     throw new Error('IPC call from an untrusted sender was rejected');
@@ -150,6 +248,56 @@ ipcMain.handle('app:get-api-access', (event): ApiAccess => {
   if (!api || !launchSecret) throw new Error('The local service is not running');
   return { baseUrl: api.baseUrl, secret: launchSecret };
 });
+
+// Invoice documents (Task 1.15). The payload is an already posted invoice SNAPSHOT; it is validated strictly and the HTML is
+// built here from the validated snapshot, never taken from the renderer. See document-ipc.ts for the contract.
+function documentHandler(
+  run: (
+    req: { html: string; fileName: string },
+    event: IpcMainInvokeEvent,
+  ) => Promise<DocumentOutputResult>,
+) {
+  return async (event: IpcMainInvokeEvent, payload: unknown): Promise<DocumentOutputResult> => {
+    assertTrusted(event);
+    const req = prepareDocumentRequest(payload);
+    if (!req.ok) throw new Error('The document request was rejected');
+    return run(req, event);
+  };
+}
+ipcMain.handle(
+  DOCUMENT_CHANNELS.savePdf,
+  documentHandler((req, event) =>
+    saveInvoicePdf(req.html, req.fileName, BrowserWindow.fromWebContents(event.sender)),
+  ),
+);
+ipcMain.handle(
+  DOCUMENT_CHANNELS.print,
+  documentHandler((req) => printInvoice(req.html)),
+);
+
+/**
+ * Verification only (unpackaged + ELECTRON_PDF_FIXTURE): renders the posted-invoice snapshot in the given JSON file through the
+ * SAME code path as Save PDF (without the save dialog) and writes the PDF where ELECTRON_PDF_OUT says.
+ */
+async function runPdfSmoke(): Promise<void> {
+  try {
+    const req = prepareDocumentRequest(
+      JSON.parse(readFileSync(process.env.ELECTRON_PDF_FIXTURE!, 'utf8')),
+    );
+    if (!req.ok) throw new Error('fixture rejected');
+    const pdf = await renderPdf(req.html);
+    writeFileSync(process.env.ELECTRON_PDF_OUT!, pdf);
+    process.stdout.write(
+      `PDF_RESULT ${JSON.stringify({ bytes: pdf.length, pages: pdfPageCount(pdf), fileName: req.fileName })}
+`,
+    );
+    app.exit(0);
+  } catch (e) {
+    process.stderr.write(`PDF_FAILED ${String(e)}
+`);
+    app.exit(1);
+  }
+}
 
 async function startLocalApi(): Promise<void> {
   const secret = generateLaunchSecret();
@@ -179,6 +327,10 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   void app.whenReady().then(async () => {
+    if (pdfSmoke) {
+      await runPdfSmoke();
+      return;
+    }
     protocol.handle(APP_SCHEME, (request) => {
       const file = resolveAppRequest(request.url, webRoot);
       if (!file) return new Response('Not found', { status: 404 });
@@ -208,7 +360,8 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    // (the PDF check has no main window: closing its hidden render window must not end the process early)
+    if (process.platform !== 'darwin' && !pdfSmoke) app.quit();
   });
   app.on('will-quit', () => {
     void api?.stop();

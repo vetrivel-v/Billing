@@ -20,6 +20,8 @@ const SECRET = 'e'.repeat(64);
 function installBridge(): DesktopBridge {
   const bridge: DesktopBridge = {
     getAppInfo: async () => ({ name: 'x', version: '0', platform: 'win32' }),
+    saveInvoicePdf: async () => ({ status: 'cancelled' }),
+    printInvoice: async () => ({ status: 'cancelled' }),
     getApiAccess: vi.fn(async () => ({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET })),
   };
   window.commercebill = bridge;
@@ -94,6 +96,8 @@ describe('api client inside the Electron shell (P1-SEC-01)', () => {
       .mockRejectedValueOnce(new Error('service not ready'))
       .mockResolvedValue({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET });
     window.commercebill = {
+      saveInvoicePdf: async () => ({ status: 'cancelled' }),
+      printInvoice: async () => ({ status: 'cancelled' }),
       getAppInfo: async () => ({ name: '', version: '', platform: '' }),
       getApiAccess,
     };

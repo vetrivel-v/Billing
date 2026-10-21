@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./invoice-snapshot": "./src/invoice-snapshot.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -14,5 +15,8 @@
     "@types/pg": "^8.23.1",
     "embedded-postgres": "^18.4.0-beta.17",
     "pg": "^8.23.1"
+  },
+  "dependencies": {
+    "@commercebill/shared-types": "^0.0.1"
   }
 }

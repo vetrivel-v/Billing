@@ -25,6 +25,8 @@ const TOKEN = 'T'.repeat(43);
 function installBridge() {
   const bridge: DesktopBridge = {
     getAppInfo: async () => ({ name: 'x', version: '0', platform: 'win32' }),
+    saveInvoicePdf: async () => ({ status: 'cancelled' }),
+    printInvoice: async () => ({ status: 'cancelled' }),
     getApiAccess: async () => ({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET }),
   };
   window.commercebill = bridge;

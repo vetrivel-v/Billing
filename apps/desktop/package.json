@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@commercebill/document-engine": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",
     "@commercebill/validation": "^0.0.1",
     "electron": "^44.8.0"

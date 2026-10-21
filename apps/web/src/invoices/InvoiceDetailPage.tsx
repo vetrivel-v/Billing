@@ -7,6 +7,7 @@ import { useAuth } from '../auth.js';
 import { stateName } from '../customers/model.js';
 import { describeFailure } from '../messages.js';
 import { formatRate, formatRupees, problemText } from './model.js';
+import { useDocumentActions } from './useDocumentActions.js';
 
 const state = (code: string) => `${stateName(code) ?? code} (${code})`;
 
@@ -45,6 +46,7 @@ export function InvoiceDetailPage() {
     retry: false,
     staleTime: Infinity,
   });
+  const docs = useDocumentActions(q.data?.invoice);
   if (q.isPending) return <LoadingState label="Loading invoice" />;
   if (q.isError) {
     const notFound = q.error instanceof ApiError && q.error.status === 404;
@@ -68,11 +70,30 @@ export function InvoiceDetailPage() {
         title={`Invoice ${inv.documentNumber}`}
         description={`Posted ${new Date(inv.createdAt).toLocaleString()} by ${inv.createdByName}`}
         actions={
-          <Button variant="secondary" onClick={() => navigate('/billing')}>
-            Back to invoices
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => navigate(`/billing/${inv.id}/print`)}>
+              Preview / Print
+            </Button>
+            <Button
+              variant="secondary"
+              loading={docs.busy === 'save'}
+              disabled={!docs.available || docs.busy !== null}
+              title={docs.available ? undefined : docs.unavailableReason}
+              onClick={() => void docs.save()}
+            >
+              Save PDF
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/billing')}>
+              Back to invoices
+            </Button>
+          </>
         }
       />
+      {docs.message && (
+        <div className="mb-4">
+          <Alert tone={docs.message.tone}>{docs.message.text}</Alert>
+        </div>
+      )}
       {notice && (
         <div className="mb-4">
           <Alert tone="success">{notice}</Alert>

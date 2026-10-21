@@ -7,6 +7,7 @@ import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
 import { InvoiceDetailPage } from './invoices/InvoiceDetailPage.js';
 import { InvoicesPage } from './invoices/InvoicesPage.js';
+import { PrintPreviewPage } from './invoices/PrintPreviewPage.js';
 import { NewInvoicePage } from './invoices/NewInvoicePage.js';
 import { InventoryPage } from './inventory/InventoryPage.js';
 import { InventoryProductPage } from './inventory/InventoryProductPage.js';
@@ -166,6 +167,14 @@ function Shell() {
           element={
             <Guarded module="billing">
               <NewInvoicePage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/billing/:id/print"
+          element={
+            <Guarded module="billing">
+              <PrintPreviewPage />
             </Guarded>
           }
         />

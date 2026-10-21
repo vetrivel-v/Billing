@@ -144,6 +144,8 @@ beforeEach(() => {
   window.commercebill = {
     getAppInfo: async () => ({ name: 'test', version: '0', platform: 'test' }),
     getApiAccess: async () => ({ baseUrl, secret: LAUNCH_SECRET }),
+    saveInvoicePdf: async () => ({ status: 'cancelled' }),
+    printInvoice: async () => ({ status: 'cancelled' }),
   };
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     sent.push({ method: init?.method ?? 'GET', url: String(url) });
