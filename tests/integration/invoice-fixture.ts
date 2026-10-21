@@ -109,6 +109,8 @@ export async function setupBillingWorld(
     for (const [documentType, prefix] of [
       ['INVOICE', 'INV/{FY}/'],
       ['DEMO_INVOICE', 'DEMO/{FY}/'],
+      ['PAYMENT_RECEIPT', 'PAY/{FY}/'],
+      ['DEMO_PAYMENT_RECEIPT', 'DPAY/{FY}/'],
     ] as const) {
       await prisma.documentSequence.create({
         data: {

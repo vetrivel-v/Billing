@@ -7,6 +7,7 @@ import { useAuth } from '../auth.js';
 import { stateName } from '../customers/model.js';
 import { describeFailure } from '../messages.js';
 import { formatRate, formatRupees, problemText } from './model.js';
+import { PaymentSection } from '../payments/PaymentSection.js';
 import { useDocumentActions } from './useDocumentActions.js';
 
 const state = (code: string) => `${stateName(code) ?? code} (${code})`;
@@ -252,6 +253,7 @@ export function InvoiceDetailPage() {
           </div>
         </dl>
       </div>
+      <PaymentSection invoice={inv} />
       {inv.tax.calculation &&
         Array.isArray((inv.tax.calculation as { warnings?: unknown }).warnings) &&
         ((inv.tax.calculation as { warnings: { code: string }[] }).warnings.length > 0 ? (

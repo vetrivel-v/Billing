@@ -79,7 +79,53 @@ const trimmedRate = (d: { toFixed(dp: number): string } | null, places: number) 
   return t.includes('.') ? t.replace(/0+$/, '').replace(/\.$/, '') || '0' : t;
 };
 
-export function toInvoiceView(r: InvoiceRow): InvoiceView {
+type PaymentSummary = InvoiceView['payment'];
+
+/** The derived paid / balance / status of invoices (grand total minus persisted allocations), computed by the database as text. */
+export async function paymentSummaries(
+  db: Prisma.TransactionClient | PrismaClient,
+  organizationId: string,
+  invoiceIds: string[],
+): Promise<Map<string, PaymentSummary>> {
+  const out = new Map<string, PaymentSummary>();
+  if (invoiceIds.length === 0) return out;
+  const rows = await db.$queryRaw<
+    {
+      invoice_id: string;
+      is_demo: boolean;
+      grand_total: string;
+      allocated: string;
+      balance_due: string;
+      status: string;
+    }[]
+  >`SELECT "invoice_id", "is_demo", "grand_total"::numeric(18,2)::text AS "grand_total", "allocated"::numeric(18,2)::text AS "allocated",
+           "balance_due"::numeric(18,2)::text AS "balance_due",
+           CASE WHEN "allocated" = 0 THEN 'UNPAID' WHEN "balance_due" > 0 THEN 'PARTIALLY_PAID' ELSE 'PAID' END AS "status"
+      FROM "invoice_balances" WHERE "organization_id" = ${organizationId}::uuid AND "invoice_id" = ANY(${invoiceIds}::uuid[])`;
+  for (const r of rows)
+    out.set(r.invoice_id, {
+      isDemo: r.is_demo,
+      grandTotal: r.grand_total,
+      allocated: r.allocated,
+      balanceDue: r.balance_due,
+      status: r.status as PaymentSummary['status'],
+    });
+  return out;
+}
+
+const noPayments = (r: {
+  isDemo: boolean;
+  grandTotal: { toFixed(dp: number): string };
+}): PaymentSummary => ({
+  isDemo: r.isDemo,
+  grandTotal: money(r.grandTotal),
+  allocated: '0.00',
+  balanceDue: money(r.grandTotal),
+  status: 'UNPAID',
+});
+
+export function toInvoiceView(r: InvoiceRow, summary?: PaymentSummary): InvoiceView {
+  const payment = summary ?? noPayments(r);
   return {
     id: r.id,
     status: 'POSTED',
@@ -151,8 +197,9 @@ export function toInvoiceView(r: InvoiceRow): InvoiceView {
       roundOff: money(r.roundOff),
       grandTotal: money(r.grandTotal),
     },
-    // Production: balance due = grand total (payment allocations arrive in Task 1.16). Demo: no receivable at all.
-    receivable: r.isDemo ? null : { allocated: '0.00', balanceDue: money(r.grandTotal) },
+    // Production: real money allocated and still due, derived from the allocations. Demo: no receivable at all (see `payment`).
+    receivable: r.isDemo ? null : { allocated: payment.allocated, balanceDue: payment.balanceDue },
+    payment,
     lines: r.lines.map((l) => ({
       id: l.id,
       lineNo: l.lineNo,
@@ -375,7 +422,8 @@ export function createInvoiceService(options: InvoiceServiceOptions) {
             [{ code: 'OPERATION_ID_REUSED', path: 'operationId' }],
           );
         }
-        return { invoice: toInvoiceView(existing), replayed: true };
+        const sums = await paymentSummaries(tx, ctx.organizationId, [existing.id]);
+        return { invoice: toInvoiceView(existing, sums.get(existing.id)), replayed: true };
       }
 
       // 1. Authoritative reload.
@@ -697,6 +745,11 @@ export function createInvoiceService(options: InvoiceServiceOptions) {
       }),
       prisma.salesInvoice.count({ where }),
     ]);
+    const sums = await paymentSummaries(
+      prisma,
+      organizationId,
+      rows.map((r) => r.id),
+    );
     const invoices: InvoiceSummaryView[] = rows.map((r) => ({
       id: r.id,
       documentNumber: r.documentNumber,
@@ -708,7 +761,13 @@ export function createInvoiceService(options: InvoiceServiceOptions) {
       taxableSubtotal: money(r.taxableSubtotal),
       taxTotal: money(r.cgstTotal.plus(r.sgstTotal).plus(r.utgstTotal).plus(r.igstTotal)),
       grandTotal: money(r.grandTotal),
-      receivable: r.isDemo ? null : { allocated: '0.00', balanceDue: money(r.grandTotal) },
+      receivable: r.isDemo
+        ? null
+        : {
+            allocated: (sums.get(r.id) ?? noPayments(r)).allocated,
+            balanceDue: (sums.get(r.id) ?? noPayments(r)).balanceDue,
+          },
+      payment: sums.get(r.id) ?? noPayments(r),
       createdAt: r.createdAt.toISOString(),
     }));
     return { invoices, total, limit: o.limit, offset: o.offset };
@@ -720,7 +779,8 @@ export function createInvoiceService(options: InvoiceServiceOptions) {
       include: viewInclude,
     });
     if (!row) throw new InvoiceError('not_found', 'Invoice not found.');
-    return toInvoiceView(row);
+    const sums = await paymentSummaries(prisma, organizationId, [row.id]);
+    return toInvoiceView(row, sums.get(row.id));
   }
 
   return { preview, post, list, get };

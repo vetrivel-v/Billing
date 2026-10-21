@@ -1,6 +1,7 @@
 export {
   InvoiceError,
   createInvoiceService,
+  paymentSummaries,
   toInvoiceView,
   type InvoiceContext,
   type InvoiceErrorCode,

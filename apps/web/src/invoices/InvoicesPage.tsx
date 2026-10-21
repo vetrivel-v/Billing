@@ -14,6 +14,7 @@ import { Link, useLocation } from 'react-router';
 import { listInvoices } from '../api.js';
 import { useAuth } from '../auth.js';
 import { describeFailure } from '../messages.js';
+import { STATUS_LABEL, STATUS_TONE } from '../payments/model.js';
 import { formatRupees } from './model.js';
 
 const PAGE_SIZE = 25;
@@ -153,40 +154,43 @@ export function InvoicesPage() {
             className="overflow-x-auto rounded-lg border border-slate-200 bg-white"
             aria-busy={result.isFetching}
           >
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-[13px]">
               <caption className="sr-only">Invoices</caption>
               <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold tracking-wide text-slate-600 uppercase">
                 <tr>
-                  <th scope="col" className="px-2.5 py-2">
+                  <th scope="col" className="px-2 py-2">
                     Invoice
                   </th>
-                  <th scope="col" className="px-2.5 py-2">
+                  <th scope="col" className="px-2 py-2">
                     Date
                   </th>
-                  <th scope="col" className="px-2.5 py-2">
+                  <th scope="col" className="px-2 py-2">
                     Customer
                   </th>
-                  <th scope="col" className="px-2.5 py-2 text-right">
+                  <th scope="col" className="hidden px-2 py-2 text-right min-[1100px]:table-cell">
                     Taxable
                   </th>
-                  <th scope="col" className="px-2.5 py-2 text-right">
+                  <th scope="col" className="hidden px-2 py-2 text-right min-[1100px]:table-cell">
                     GST
                   </th>
-                  <th scope="col" className="px-2.5 py-2 text-right">
+                  <th scope="col" className="px-2 py-2 text-right">
                     Total
                   </th>
-                  <th scope="col" className="px-2.5 py-2">
+                  <th scope="col" className="px-2 py-2">
                     Type
                   </th>
-                  <th scope="col" className="px-2.5 py-2">
-                    Status
+                  <th scope="col" className="px-2 py-2 text-right">
+                    Balance
+                  </th>
+                  <th scope="col" className="px-2 py-2">
+                    Payment
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data!.invoices.map((i) => (
                   <tr key={i.id} className="hover:bg-slate-50">
-                    <td className="px-2.5 py-2 font-mono text-xs whitespace-nowrap">
+                    <td className="px-2 py-2 font-mono text-xs whitespace-nowrap">
                       <Link
                         to={`/billing/${i.id}`}
                         className={link}
@@ -195,28 +199,35 @@ export function InvoicesPage() {
                         {i.documentNumber}
                       </Link>
                     </td>
-                    <td className="px-2.5 py-2 whitespace-nowrap">{i.invoiceDate}</td>
-                    <td className="px-2.5 py-2">
-                      <div className="max-w-xs min-w-[8rem] break-words">{i.customerName}</div>
+                    <td className="px-2 py-2 whitespace-nowrap">{i.invoiceDate}</td>
+                    <td className="px-2 py-2">
+                      <div className="max-w-[10rem] min-w-[7rem] break-words">{i.customerName}</div>
                     </td>
-                    <td className="px-2.5 py-2 text-right whitespace-nowrap tabular-nums">
+                    <td className="hidden px-2 py-2 text-right whitespace-nowrap tabular-nums min-[1100px]:table-cell">
                       {formatRupees(i.taxableSubtotal)}
                     </td>
-                    <td className="px-2.5 py-2 text-right whitespace-nowrap tabular-nums">
+                    <td className="hidden px-2 py-2 text-right whitespace-nowrap tabular-nums min-[1100px]:table-cell">
                       {formatRupees(i.taxTotal)}
                     </td>
-                    <td className="px-2.5 py-2 text-right font-medium whitespace-nowrap tabular-nums">
+                    <td className="px-2 py-2 text-right font-medium whitespace-nowrap tabular-nums">
                       {formatRupees(i.grandTotal)}
                     </td>
-                    <td className="px-2.5 py-2">
+                    <td className="px-2 py-2">
                       {i.isDemo ? (
                         <Badge tone="warning">DEMO</Badge>
                       ) : (
                         <Badge tone="brand">Production</Badge>
                       )}
                     </td>
-                    <td className="px-2.5 py-2">
-                      <Badge tone="success">Posted</Badge>
+                    <td className="px-2 py-2 text-right whitespace-nowrap tabular-nums">
+                      {formatRupees(i.payment.balanceDue)}
+                    </td>
+                    <td className="px-2 py-2">
+                      <Badge tone={STATUS_TONE[i.payment.status]}>
+                        {i.isDemo
+                          ? `Demo ${STATUS_LABEL[i.payment.status].toLowerCase()}`
+                          : STATUS_LABEL[i.payment.status]}
+                      </Badge>
                     </td>
                   </tr>
                 ))}

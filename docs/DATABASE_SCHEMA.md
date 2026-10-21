@@ -214,6 +214,14 @@ cleared or changed). Existing violating rows make the migration abort atomically
 - View `production_sales_invoices` (`security_invoker`, `NOT is_demo`) for production reporting.
 - There is no receivable table (Option A, ADR-0024).
 
+### 3.11 Changes in migration `20261027000000_task_1_16_payments` (Task 1.16)
+
+- New table `payments` (append-only; UPDATE/DELETE/TRUNCATE refused): organization, customer, `document_type` (PAYMENT_RECEIPT | DEMO_PAYMENT_RECEIPT), `payment_number` (unique per organization and type), `is_demo`, `status` (RECORDED), `payment_date`, `amount` numeric(18,2) > 0, `method` (CASH | BANK_TRANSFER | UPI | CARD | CHEQUE | OTHER), optional `reference` (required for bank transfer, UPI and cheque; at most 60 characters) and `notes` (at most 500), financial year, `post_operation_id` (unique per organization), `request_fingerprint`, `created_by`, `created_at`, `correlation_id`.
+- New table `payment_allocations` (append-only): payment, invoice (composite foreign keys keep both in the same organization), `is_demo`, `amount` > 0; unique per (payment, invoice).
+- `document_sequences`: every existing PAYMENT_RECEIPT sequence gains a `DEMO_PAYMENT_RECEIPT` twin (`DPAY/{FY}/`); setup creates it for new organizations (seven sequences).
+- Triggers: before-insert checks (customer, financial year and user belong to the organization; an allocation can only be added in the transaction that created its payment, for an invoice of the same customer and the same kind - demo with demo, production with production); deferred constraint triggers at COMMIT: the payment number was issued by the numbering ledger and the allocations sum to the payment amount; the allocations of an invoice never exceed its grand total (the invoice row is locked first, so concurrent writers are serialized).
+- View `invoice_balances` (`security_invoker`): per invoice, grand total, allocated and balance due. There is NO balance column on any table.
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.

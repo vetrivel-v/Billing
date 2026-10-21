@@ -19,12 +19,14 @@ import { registerUserRoutes } from './user-routes.js';
 import { registerCustomerRoutes } from './customer-routes.js';
 import { registerInventoryRoutes } from './inventory-routes.js';
 import { registerInvoiceRoutes } from './invoice-routes.js';
+import { registerPaymentRoutes } from './payment-routes.js';
 import { registerProductRoutes } from './product-routes.js';
 import { registerTaxRoutes } from './tax-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
 import { createProductService } from '@commercebill/products';
 import { createTaxConfigService } from '@commercebill/tax-config';
 import { createInvoiceService } from '@commercebill/invoicing';
+import { createPaymentService } from '@commercebill/payments';
 import { createNumberingService } from '@commercebill/numbering';
 import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
@@ -269,6 +271,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       createInvoiceService({
         prisma: deps.prisma,
         taxConfig: taxConfigService,
+        numbering: createNumberingService({
+          appVersion: APP_VERSION,
+          ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+        }),
+        appVersion: APP_VERSION,
+        ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+      }),
+    );
+    await registerPaymentRoutes(
+      app,
+      createPaymentService({
+        prisma: deps.prisma,
         numbering: createNumberingService({
           appVersion: APP_VERSION,
           ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),

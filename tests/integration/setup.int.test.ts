@@ -482,7 +482,7 @@ describe('successful setup and everything after it', () => {
     expect(after).toMatchObject({
       organizations: 1,
       organizationSettings: 3,
-      documentSequences: 6,
+      documentSequences: 7,
       allocations: 0,
       locations: 1,
       warehouses: 1,
@@ -561,6 +561,7 @@ describe('successful setup and everything after it', () => {
       ['CREDIT_NOTE', 'CN/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
       ['DEBIT_NOTE', 'DN/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
       ['DEMO_INVOICE', 'DEMO/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
+      ['DEMO_PAYMENT_RECEIPT', 'DPAY/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
       ['INVOICE', 'INV/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
       ['PAYMENT_RECEIPT', 'PAY/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
       ['PURCHASE_ORDER', 'PO/{FY}/', 6, 1, 'FINANCIAL_YEAR', true, null],
@@ -582,7 +583,7 @@ describe('successful setup and everything after it', () => {
     const audit = await fx.prisma.auditLog.findMany({
       where: { action: 'numbering.sequence.created' },
     });
-    expect(audit).toHaveLength(6);
+    expect(audit).toHaveLength(7);
     expect(
       audit.every(
         (a) =>
@@ -898,7 +899,7 @@ describe('setup-time numbering configuration', () => {
     };
     const r = await complete(app, body);
     expect(r.status, r.body).toBe(201);
-    expect(await fx.prisma.documentSequence.count()).toBe(6);
+    expect(await fx.prisma.documentSequence.count()).toBe(7);
     expect(await fx.prisma.documentNumberAllocation.count()).toBe(0);
     const org = await fx.prisma.organization.findFirstOrThrow();
     const fy = await fx.prisma.financialYear.findFirstOrThrow();

@@ -16,10 +16,15 @@ import type {
   TaxReviewListResponse,
   TaxReviewView,
   BillingMode,
+  CustomerReceivableResponse,
   InvoiceListResponse,
   InvoicePostResponse,
   InvoicePreviewResponse,
   InvoiceView,
+  PaymentListResponse,
+  PaymentRecordResponse,
+  PaymentView,
+  ReceivablesResponse,
   StockListResponse,
   StockMovementListResponse,
   StockOperationResponse,
@@ -455,3 +460,59 @@ export const postInvoice = (
   token: string,
   body: Record<string, unknown>,
 ): Promise<InvoicePostResponse> => callApi('POST', '/invoices', { token, body });
+
+// ---------------------------------------------------------------------------------------------- payments and receivables
+
+export interface PaymentQuery {
+  search?: string;
+  method?: string;
+  isDemo?: boolean;
+  from?: string;
+  to?: string;
+  invoiceId?: string;
+  limit: number;
+  offset: number;
+}
+
+export function listPayments(token: string, q: PaymentQuery): Promise<PaymentListResponse> {
+  const params = new URLSearchParams();
+  if (q.search) params.set('search', q.search);
+  if (q.method) params.set('method', q.method);
+  if (q.isDemo !== undefined) params.set('isDemo', String(q.isDemo));
+  if (q.from) params.set('from', q.from);
+  if (q.to) params.set('to', q.to);
+  if (q.invoiceId) params.set('invoiceId', q.invoiceId);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/payments?${params.toString()}`, { token });
+}
+
+export const getPayment = (token: string, id: string): Promise<{ payment: PaymentView }> =>
+  callApi('GET', `/payments/${encodeURIComponent(id)}`, { token });
+
+export const recordPayment = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<PaymentRecordResponse> => callApi('POST', '/payments', { token, body });
+
+export function getReceivables(
+  token: string,
+  q: { isDemo: boolean; search?: string; limit: number; offset: number },
+): Promise<ReceivablesResponse> {
+  const params = new URLSearchParams({ isDemo: String(q.isDemo) });
+  if (q.search) params.set('search', q.search);
+  params.set('limit', String(q.limit));
+  params.set('offset', String(q.offset));
+  return callApi('GET', `/receivables?${params.toString()}`, { token });
+}
+
+export const getCustomerReceivable = (
+  token: string,
+  customerId: string,
+  isDemo: boolean,
+): Promise<CustomerReceivableResponse> =>
+  callApi(
+    'GET',
+    `/receivables/customers/${encodeURIComponent(customerId)}?isDemo=${String(isDemo)}`,
+    { token },
+  );

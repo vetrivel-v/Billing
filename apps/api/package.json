@@ -16,6 +16,7 @@
     "@commercebill/inventory-engine": "^0.0.1",
     "@commercebill/invoicing": "^0.0.1",
     "@commercebill/numbering": "^0.0.1",
+    "@commercebill/payments": "^0.0.1",
     "@commercebill/products": "^0.0.1",
     "@commercebill/setup": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",

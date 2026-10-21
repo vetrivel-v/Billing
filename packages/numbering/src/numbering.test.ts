@@ -31,6 +31,7 @@ describe('document type registry', () => {
         'CREDIT_NOTE',
         'DEBIT_NOTE',
         'DEMO_INVOICE',
+        'DEMO_PAYMENT_RECEIPT',
         'INVOICE',
         'PAYMENT_RECEIPT',
         'PURCHASE_ORDER',

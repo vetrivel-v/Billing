@@ -446,13 +446,17 @@ describe('reference vs demo (F) and the CLI', () => {
     // The stock ledger exists since Task 1.11, but reference seeding must never put a movement or balance in it.
     expect(await prisma.stockMovement.count()).toBe(0);
     expect(await prisma.stockBalance.count()).toBe(0);
-    // No table for invoices/payments/journals exists yet.
+    // The invoice and payment tables exist since Tasks 1.13 and 1.16, but reference seeding must never put a row in them.
+    expect(await prisma.salesInvoice.count()).toBe(0);
+    expect(await prisma.payment.count()).toBe(0);
+    expect(await prisma.paymentAllocation.count()).toBe(0);
+    // No table for journals exists yet.
     const tables = (
       await prisma.$queryRaw<
         { table_name: string }[]
       >`SELECT table_name FROM information_schema.tables WHERE table_schema='public'`
     ).map((t) => t.table_name);
-    for (const t of ['invoices', 'payments', 'journal_entries']) {
+    for (const t of ['invoices', 'journal_entries']) {
       expect(tables).not.toContain(t);
     }
   });

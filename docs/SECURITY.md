@@ -81,3 +81,12 @@ reviewed in the diff.
 - The destination is chosen only in the operating system save dialog; a `.pdf` extension is enforced; a PDF signature is checked before anything is written. The result never contains a path.
 - Print never runs silently. The preload exposes exactly four methods and no file-system, shell or navigation capability (source guard-rail tests).
 - Logs and diagnostics carry no invoice, customer or tax content. A document needs `sales.invoice.read` (the snapshot is read through the normal API and organization boundary).
+
+## Task 1.16 controls (payments and receivables; ADR-0026)
+
+- Exact permission keys: `sales.payment.record` (record), `sales.payment.read` (list, view, receivables); organization from the session; another organization's invoice, customer or payment is not found. Warehouse Operator has no payment access.
+- The browser sends choices only. Unknown fields (balance, already paid, customer, organization) are refused; the balance is always derived from the immutable grand total and the persisted allocations.
+- Payments and allocations are immutable in the database (triggers) as well as in the API; the over-allocation limit is enforced by a locked, deferred database constraint, not only by the service or the screen.
+- Idempotency by operation id; the same id with different content is refused.
+- No card numbers, PINs or credentials are collected: a reference that looks like a card number is refused. Logs and the audit row carry no reference, notes or customer content.
+- DEMO payments are separate records that can only touch demo invoices and never enter production receivables.

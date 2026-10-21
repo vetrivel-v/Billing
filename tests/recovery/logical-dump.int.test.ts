@@ -96,7 +96,7 @@ describe('R-031 spike: logical dump and restore without pg_dump', () => {
       tax_rates: 1,
       audit_logs: 1,
     });
-    expect(dump.manifest.tables.length).toBe(28);
+    expect(dump.manifest.tables.length).toBe(30);
   });
 
   it('restores into a freshly migrated isolated database with identical content', async () => {

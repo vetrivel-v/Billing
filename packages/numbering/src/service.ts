@@ -677,6 +677,7 @@ export interface SetupNumberingInput {
   purchasePrefix?: string;
   paymentPrefix?: string;
   demoInvoicePrefix?: string;
+  demoPaymentPrefix?: string;
   numericWidth?: number;
 }
 
@@ -687,6 +688,7 @@ export const SETUP_PREFIX_FIELDS = {
   debitNotePrefix: 'DEBIT_NOTE',
   purchasePrefix: 'PURCHASE_ORDER',
   paymentPrefix: 'PAYMENT_RECEIPT',
+  demoPaymentPrefix: 'DEMO_PAYMENT_RECEIPT',
 } as const satisfies Record<string, DocumentTypeCode>;
 
 /** The sequences first-run setup creates for the first financial year, from the (optional) wizard answers. */

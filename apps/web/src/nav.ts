@@ -49,6 +49,20 @@ export const MODULES: readonly NavModule[] = [
     available: true,
   },
   {
+    key: 'payments',
+    label: 'Payments',
+    path: '/payments',
+    permission: 'sales.payment.read',
+    available: true,
+  },
+  {
+    key: 'receivables',
+    label: 'Receivables',
+    path: '/receivables',
+    permission: 'sales.payment.read',
+    available: true,
+  },
+  {
     key: 'settings',
     label: 'Settings',
     path: '/settings',

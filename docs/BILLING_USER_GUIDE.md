@@ -16,3 +16,20 @@ Billing is in **demo mode** until backup and restore have been verified. Demo in
 - **Preview / Print** shows the A4 document. **Print...** opens your system print dialog; you choose the printer. **Save PDF** asks where to save the file.
 - Every demo document is marked DEMO on every page and cannot be printed without it.
 - Printing and saving need the CommerceBill desktop app.
+
+## Record a payment
+
+1. Open an invoice and choose **Record payment** (**Record demo payment** on a demo invoice). The page shows the invoice total, what has been paid and the balance, all worked out by the server.
+2. Enter the **amount received**, the **payment method** and a **reference** (required for UPI, bank transfer and cheque). Never enter a card number. Notes are optional. The payment is dated today.
+3. **Record payment.** If the connection drops, choose **Retry**: it will not record the payment twice. If the amount is more than the balance, nothing is recorded and you are told the balance due.
+
+A recorded payment cannot be edited or deleted, and correcting one is not supported yet.
+
+## Demo payments
+
+Until backup and restore are verified, only demo invoices exist, so payments are **demo payments**: they have their own numbers (`DPAY/...`), are marked DEMO everywhere, are **not real receipts** and never count as money received or in production receivables.
+
+## Payments and receivables
+
+- **Payments** lists recorded payments (search, method, type and date filters).
+- **Receivables** shows, per customer, what was invoiced, paid and is outstanding; open a customer to see each invoice and whether it is unpaid, partly paid or paid. Choose **Demo (not real)** to see demo figures, which are kept apart from production.

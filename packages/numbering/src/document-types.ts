@@ -32,6 +32,15 @@ export const DOCUMENT_TYPES = {
     label: 'Payment receipt',
     defaultPrefix: 'PAY/{FY}/',
   },
+  /**
+   * Demo payments (Task 1.16): a separate sequence with a visibly different prefix. A demo payment is NOT money received and
+   * never consumes the production PAYMENT_RECEIPT sequence.
+   */
+  DEMO_PAYMENT_RECEIPT: {
+    code: 'DEMO_PAYMENT_RECEIPT',
+    label: 'Demo payment (not a real receipt)',
+    defaultPrefix: 'DPAY/{FY}/',
+  },
 } as const satisfies Record<string, DocumentTypeDef>;
 
 export type DocumentTypeCode = keyof typeof DOCUMENT_TYPES;

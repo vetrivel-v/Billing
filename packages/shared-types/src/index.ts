@@ -485,6 +485,21 @@ export interface InvoiceLineView {
   stockEffect: 'DISPATCH' | 'NONE';
 }
 
+/** Derived display state of an invoice's payments. The invoice itself stays immutable; nothing stores this. */
+export type PaymentDisplayStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
+
+/**
+ * What has been allocated to an invoice and what remains: grand total minus the persisted allocations, derived by the server.
+ * For a DEMO invoice these are DEMO figures: not money received.
+ */
+export interface InvoicePaymentSummary {
+  isDemo: boolean;
+  grandTotal: string;
+  allocated: string;
+  balanceDue: string;
+  status: PaymentDisplayStatus;
+}
+
 export interface InvoiceReceivableView {
   allocated: string;
   balanceDue: string;
@@ -563,6 +578,8 @@ export interface InvoiceView {
   };
   /** Production invoices: balance due = grand total (no payments before Task 1.16). Demo invoices: null. */
   receivable: InvoiceReceivableView | null;
+  /** Derived paid / balance / status (DEMO figures for a demo invoice). */
+  payment: InvoicePaymentSummary;
   lines: InvoiceLineView[];
   createdAt: string;
   createdByName: string;
@@ -581,6 +598,7 @@ export interface InvoiceSummaryView {
   taxTotal: string;
   grandTotal: string;
   receivable: InvoiceReceivableView | null;
+  payment: InvoicePaymentSummary;
   createdAt: string;
 }
 
@@ -595,4 +613,75 @@ export interface InvoicePostResponse {
   invoice: InvoiceView;
   /** True when this exact operation had already been posted: the original invoice is returned and nothing changed. */
   replayed: boolean;
+}
+
+// ------------------------------------------------------------------------------------------------ payments (Task 1.16)
+
+export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'CHEQUE' | 'OTHER';
+
+export interface PaymentView {
+  id: string;
+  paymentNumber: string;
+  documentType: 'PAYMENT_RECEIPT' | 'DEMO_PAYMENT_RECEIPT';
+  /** A DEMO payment is NOT money received. */
+  isDemo: boolean;
+  paymentDate: string;
+  amount: string;
+  method: PaymentMethod;
+  reference: string | null;
+  notes: string | null;
+  customer: { id: string; code: string; name: string };
+  allocations: { invoiceId: string; invoiceNumber: string; amount: string }[];
+  createdAt: string;
+  createdByName: string;
+}
+
+export interface PaymentListResponse {
+  payments: PaymentView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface PaymentRecordResponse {
+  payment: PaymentView;
+  /** True when this exact operation had already been recorded: the original payment is returned and nothing changed. */
+  replayed: boolean;
+  invoice: { id: string; documentNumber: string } & InvoicePaymentSummary;
+}
+
+export interface ReceivableCustomerRow {
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  invoiceCount: number;
+  totalInvoiced: string;
+  totalPaid: string;
+  outstanding: string;
+}
+
+export interface ReceivablesResponse {
+  isDemo: boolean;
+  customers: ReceivableCustomerRow[];
+  totals: { invoiced: string; paid: string; outstanding: string };
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ReceivableInvoiceRow {
+  invoiceId: string;
+  documentNumber: string;
+  invoiceDate: string;
+  grandTotal: string;
+  paid: string;
+  balanceDue: string;
+  status: PaymentDisplayStatus;
+}
+
+export interface CustomerReceivableResponse {
+  isDemo: boolean;
+  customer: { id: string; code: string; name: string };
+  totals: { invoiced: string; paid: string; outstanding: string };
+  invoices: ReceivableInvoiceRow[];
 }

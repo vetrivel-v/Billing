@@ -62,6 +62,8 @@ model Organization {
   stockBalances             StockBalance[]
   hsnSacCodes               HsnSacCode[]
   salesInvoices             SalesInvoice[]
+  payments                  Payment[]
+  paymentAllocations        PaymentAllocation[]
   taxConfigurationReviews   TaxConfigurationReview[]
   users                     User[]
   roles                     Role[]
@@ -136,6 +138,7 @@ model FinancialYear {
   organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   sequences     DocumentSequence[]
   salesInvoices SalesInvoice[]
+  payments      Payment[]
 
   @@unique([organizationId, label])
   @@index([organizationId, startDate, endDate])
@@ -196,6 +199,7 @@ model User {
   taxReviews        TaxConfigurationReview[] @relation("TaxReviewer")
   invoicesCreated   SalesInvoice[]           @relation("InvoiceCreator")
   invoicesConfirmed SalesInvoice[]           @relation("InvoicePosConfirmer")
+  paymentsCreated   Payment[]                @relation("PaymentCreator")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -521,6 +525,7 @@ model Customer {
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   salesInvoices SalesInvoice[]
+  payments      Payment[]
 
   // The GSTIN uniqueness (partial: only where a GSTIN exists) is a partial unique index in the migration.
   @@unique([organizationId, code])
@@ -761,6 +766,7 @@ model SalesInvoice {
   posConfirmer  User                    @relation("InvoicePosConfirmer", fields: [posConfirmedBy], references: [id], onDelete: Restrict)
   taxReview     TaxConfigurationReview? @relation(fields: [taxReviewId], references: [id], onDelete: Restrict)
   lines         SalesInvoiceLine[]
+  allocations   PaymentAllocation[]
 
   @@unique([organizationId, postOperationId])
   @@unique([organizationId, documentType, documentNumber])
@@ -867,4 +873,64 @@ model ApplicationSetting {
 
   @@unique([organizationId, key])
   @@map("application_settings")
+}
+
+/// A customer payment (Task 1.16). Append-only: UPDATE, DELETE and TRUNCATE are refused by triggers; a correction is a future
+/// reversal entry. A DEMO payment (is_demo) is NOT money received: it can only be allocated to a demo invoice and never enters
+/// production receivables. Always fully allocated at creation (the allocations sum to the amount).
+model Payment {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  customerId         String   @map("customer_id") @db.Uuid
+  /// PAYMENT_RECEIPT (production) or DEMO_PAYMENT_RECEIPT.
+  documentType       String   @map("document_type")
+  paymentNumber      String   @map("payment_number")
+  isDemo             Boolean  @map("is_demo")
+  status             String   @default("RECORDED")
+  paymentDate        DateTime @map("payment_date") @db.Date
+  amount             Decimal  @db.Decimal(18, 2)
+  /// CASH | BANK_TRANSFER | UPI | CARD | CHEQUE | OTHER. Never card numbers, PINs or credentials.
+  method             String
+  reference          String?
+  notes              String?
+  financialYearId    String   @map("financial_year_id") @db.Uuid
+  /// The client idempotency identity; one payment per organization and operation.
+  postOperationId    String   @map("post_operation_id") @db.Uuid
+  requestFingerprint String   @map("request_fingerprint")
+  createdBy          String   @map("created_by") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  correlationId      String?  @map("correlation_id")
+
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  financialYear FinancialYear       @relation(fields: [financialYearId], references: [id], onDelete: Restrict)
+  creator       User                @relation("PaymentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  allocations   PaymentAllocation[]
+
+  @@unique([organizationId, postOperationId])
+  @@unique([organizationId, documentType, paymentNumber])
+  @@unique([id, organizationId])
+  @@index([organizationId, paymentDate(sort: Desc)])
+  @@index([organizationId, customerId])
+  @@map("payments")
+}
+
+/// Appends an amount of one payment to one invoice. The balance of an invoice is its immutable grand total minus the sum of
+/// its allocations: there is no stored balance anywhere.
+model PaymentAllocation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  paymentId      String   @map("payment_id") @db.Uuid
+  invoiceId      String   @map("invoice_id") @db.Uuid
+  isDemo         Boolean  @map("is_demo")
+  amount         Decimal  @db.Decimal(18, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  payment      Payment      @relation(fields: [paymentId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  invoice      SalesInvoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([paymentId, invoiceId])
+  @@index([organizationId, invoiceId])
+  @@map("payment_allocations")
 }

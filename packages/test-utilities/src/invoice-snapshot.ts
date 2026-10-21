@@ -186,6 +186,13 @@ export function makeInvoice(o: FixtureOptions): InvoiceView {
       grandTotal: p2(grand),
     },
     receivable: isDemo ? null : { allocated: '0.00', balanceDue: p2(grand) },
+    payment: {
+      isDemo,
+      grandTotal: p2(grand),
+      allocated: '0.00',
+      balanceDue: p2(grand),
+      status: 'UNPAID',
+    },
     lines,
     createdAt: '2026-10-20T07:11:51.000Z',
     createdByName: 'Administrator (test)',

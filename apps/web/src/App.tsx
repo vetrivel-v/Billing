@@ -5,6 +5,9 @@ import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
+import { CustomerReceivablePage, ReceivablesPage } from './payments/ReceivablesPage.js';
+import { PaymentsPage } from './payments/PaymentsPage.js';
+import { RecordPaymentPage } from './payments/RecordPaymentPage.js';
 import { InvoiceDetailPage } from './invoices/InvoiceDetailPage.js';
 import { InvoicesPage } from './invoices/InvoicesPage.js';
 import { PrintPreviewPage } from './invoices/PrintPreviewPage.js';
@@ -171,6 +174,38 @@ function Shell() {
           }
         />
         <Route
+          path="/billing/:id/payment"
+          element={
+            <Guarded module="payments">
+              <RecordPaymentPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <Guarded module="payments">
+              <PaymentsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/receivables"
+          element={
+            <Guarded module="receivables">
+              <ReceivablesPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/receivables/:customerId"
+          element={
+            <Guarded module="receivables">
+              <CustomerReceivablePage />
+            </Guarded>
+          }
+        />
+        <Route
           path="/billing/:id/print"
           element={
             <Guarded module="billing">
@@ -193,6 +228,8 @@ function Shell() {
             m.key !== 'products' &&
             m.key !== 'inventory' &&
             m.key !== 'billing' &&
+            m.key !== 'payments' &&
+            m.key !== 'receivables' &&
             m.key !== 'tax',
         ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />
