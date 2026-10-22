@@ -248,5 +248,9 @@ export function uninstallEntries(): { name: string; location: string }[] {
   );
 }
 
+/**
+ * Deletes a temporary folder. Windows (antivirus, the search indexer, a handle that is still closing) can hold a just-written file for a
+ * short while after its program has ended, so the delete is retried for up to a minute instead of failing the check on a transient lock.
+ */
 export const removeDir = (dir: string) =>
-  rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+  rmSync(dir, { recursive: true, force: true, maxRetries: 120, retryDelay: 500 });
