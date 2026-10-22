@@ -37,7 +37,7 @@ export type StepKey = (typeof STEPS)[number]['key'];
 export const UNSUPPORTED_AT_SETUP = [
   'Business phone, email and website',
   'Bank account and UPI payment details',
-  'Backup destination (production backup arrives in a later release; no backups are active yet)',
+  'Backup folder (chosen after setup under Settings, Backup & Recovery; no backup exists until you create one)',
 ] as const;
 
 export interface WizardForm {

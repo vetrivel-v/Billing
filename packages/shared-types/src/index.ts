@@ -803,3 +803,52 @@ export interface BackupReadinessResponse {
   eligible: boolean;
   items: ReadinessItem[];
 }
+
+// ---- Dashboard (Task 1.18) ---------------------------------------------------------------------------------------------
+
+/** Totals for one kind of document. DEMO and PRODUCTION are always reported separately, never added together. */
+export interface DashboardTotals {
+  count: number;
+  /** Money as a decimal string with two places. */
+  total: string;
+}
+export interface DashboardByMode<T> {
+  demo: T;
+  production: T;
+}
+export interface DashboardRecentInvoice {
+  id: string;
+  documentNumber: string;
+  invoiceDate: string;
+  customerName: string;
+  grandTotal: string;
+  balanceDue: string;
+  isDemo: boolean;
+}
+export interface DashboardRecentPayment {
+  id: string;
+  paymentNumber: string;
+  paymentDate: string;
+  customerName: string;
+  amount: string;
+  isDemo: boolean;
+}
+/** Every section is null when the caller lacks the permission its data needs. Nothing here is estimated or invented. */
+export interface DashboardSummaryResponse {
+  /** Business date (India) the figures are for. */
+  asOf: string;
+  mode: BillingMode;
+  sales: DashboardByMode<{ today: DashboardTotals; month: DashboardTotals }> | null;
+  receivables: DashboardByMode<{ outstanding: string; openInvoices: number }> | null;
+  paymentsToday: DashboardByMode<DashboardTotals> | null;
+  recentInvoices: DashboardRecentInvoice[] | null;
+  recentPayments: DashboardRecentPayment[] | null;
+  /** Tracked products only. No reorder levels exist yet, so only "nothing on hand" is reported. */
+  stock: { trackedProducts: number; withStock: number; outOfStock: number } | null;
+  recovery: {
+    gate: BackupRecoveryGate;
+    lastBackupAt: string | null;
+    lastVerifiedAt: string | null;
+  } | null;
+  readiness: { items: ReadinessItem[]; ready: boolean } | null;
+}

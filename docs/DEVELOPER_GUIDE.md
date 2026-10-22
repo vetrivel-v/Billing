@@ -57,3 +57,9 @@ note in the ADR. The renderer must not receive Node, filesystem or shell access.
 
 Prettier (`npm run format`), ESLint (`no-console` in app code; `parseFloat` banned), TypeScript strict with
 `noUncheckedIndexedAccess`, `verbatimModuleSyntax`. Imports use `.js` extensions for relative paths.
+
+## Running the desktop app and the end-to-end check (Task 1.18)
+
+There is no installer yet. To run the real desktop app from the project folder: `npm run build`, make sure a PostgreSQL database is reachable (`npm run db:start`, then `npm run db:migrate`), and start Electron from `apps/desktop` (`npx electron .` with `DATABASE_URL` set). An empty database opens the setup wizard.
+
+`tests/integration/fub-electron.int.test.ts` is the FIRST USABLE BILLING end-to-end check: the real Electron main process, preload and renderer (served from `app://`), the real API and a real PostgreSQL database that starts EMPTY. A driver (`tests/e2e/driver.ts`, bundled with esbuild and run inside the renderer by `runE2e` in `apps/desktop/src/main.ts`, enabled only by `ELECTRON_E2E=1` in an unpackaged build) operates the real screens like a person, in two separate launches that share the database. Only the native save, print and folder/file dialogs are replaced by hooks. Playwright is not installed; the driver uses `@testing-library/dom`. Run it alone with `npx vitest run --project integration tests/integration/fub-electron`. Close other heavy programs first: the full gate is sensitive to a machine with little free memory (risk R-104).

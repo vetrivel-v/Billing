@@ -41,6 +41,8 @@ const smoke = process.env.ELECTRON_SMOKE === '1' && !app.isPackaged;
 const docSmoke = process.env.ELECTRON_DOC_SMOKE === '1' && !app.isPackaged;
 // Verification only: drive the real Backup & Recovery screens in the real renderer (see runBackupSmoke).
 const backupSmoke = process.env.ELECTRON_BACKUP_SMOKE === '1' && !app.isPackaged;
+// Verification only: the First Usable Billing end-to-end check (see runE2e).
+const e2e = process.env.ELECTRON_E2E === '1' && !app.isPackaged;
 // Verification only: render one invoice snapshot to PDF and exit (no window, no API). See runPdfSmoke.
 const pdfSmoke = !app.isPackaged && Boolean(process.env.ELECTRON_PDF_FIXTURE);
 // Dev layout: apps/desktop/dist -> apps/web/dist and apps/api/dist. Packaged layout is Phase 6 work.
@@ -78,12 +80,13 @@ function createWindow(): BrowserWindow {
     if (!isAllowedNavigation(url, devServerUrl)) event.preventDefault();
   });
   win.once('ready-to-show', () => {
-    if (!smoke && !docSmoke && !backupSmoke) win.show();
+    if (!smoke && !docSmoke && !backupSmoke && !e2e) win.show();
   });
 
   if (smoke) runSmokeCheck(win);
   if (docSmoke) runDocumentSmoke(win);
   if (backupSmoke) runBackupSmoke(win);
+  if (e2e) runE2e(win);
 
   void win.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`);
   return win;
@@ -150,10 +153,10 @@ function runSmokeCheck(win: BrowserWindow): void {
       .catch(async (e: unknown) => {
         process.stderr.write(`SMOKE_FAILED ${String(e)}\n`);
         await api?.stop();
-        app.exit(1);
+        endProcess(1);
       });
   });
-  win.webContents.once('did-fail-load', () => app.exit(1));
+  win.webContents.once('did-fail-load', () => endProcess(1));
 }
 
 /**
@@ -232,10 +235,10 @@ function runDocumentSmoke(win: BrowserWindow): void {
       .catch(async (e: unknown) => {
         process.stderr.write(`DOC_SMOKE_FAILED ${String(e)}\n`);
         await api?.stop();
-        app.exit(1);
+        endProcess(1);
       });
   });
-  win.webContents.once('did-fail-load', () => app.exit(1));
+  win.webContents.once('did-fail-load', () => endProcess(1));
 }
 
 /**
@@ -327,10 +330,67 @@ function runBackupSmoke(win: BrowserWindow): void {
       .catch(async (e: unknown) => {
         process.stderr.write(`BACKUP_SMOKE_FAILED ${String(e)}\n`);
         await api?.stop();
-        app.exit(1);
+        endProcess(1);
       });
   });
-  win.webContents.once('did-fail-load', () => app.exit(1));
+  win.webContents.once('did-fail-load', () => endProcess(1));
+}
+
+/**
+ * Verification only (unpackaged + ELECTRON_E2E=1): the First Usable Billing end-to-end check. The real Electron main process, real preload,
+ * real renderer served from app://, real API and a real PostgreSQL database; a driver script (ELECTRON_E2E_SCRIPT, built by the test)
+ * operates the real screens like a person, one stage per launch (ELECTRON_E2E_STAGE). Only the native save, print and folder/file dialogs
+ * are replaced by hooks that use the throwaway folder ELECTRON_E2E_DIR. Nothing about the security settings is relaxed.
+ */
+function runE2e(win: BrowserWindow): void {
+  const dir = process.env.ELECTRON_E2E_DIR ?? '';
+  const stage = process.env.ELECTRON_E2E_STAGE ?? '';
+  const firstBackup = (): string | undefined => {
+    const folder = join(dir, 'backups');
+    const name = readdirSync(folder).find((f) => f.endsWith('.cbbackup'));
+    return name ? join(folder, name) : undefined;
+  };
+  setOutputHooks({
+    chooseSavePath: async (fileName) => join(dir, 'pdf', fileName),
+    skipPrintDialog: true,
+  });
+  setBackupDialogHooks({ folder: join(dir, 'backups'), file: firstBackup });
+  win.webContents.once('did-finish-load', () => {
+    const bundle = readFileSync(process.env.ELECTRON_E2E_SCRIPT ?? '', 'utf8');
+    const code = `${bundle}\n;window.__E2E__ = ${process.env.ELECTRON_E2E_ENV ?? '{}'};\nwindow.__fub[${JSON.stringify(stage)}]()`;
+    void win.webContents
+      .executeJavaScript(code)
+      .then(async (r: Record<string, unknown>) => {
+        await new Promise((resolve) => setTimeout(resolve, 500)); // let the API flush its request logs
+        const apiOutput = api ? api.output() : '';
+        process.stdout.write(
+          `E2E_RESULT ${JSON.stringify({
+            stage,
+            ...r,
+            controlSecretInApiOutput: Boolean(controlSecret && apiOutput.includes(controlSecret)),
+            launchSecretInApiOutput: Boolean(launchSecret && apiOutput.includes(launchSecret)),
+          })}\n`,
+        );
+        await api?.stop();
+        app.exit(0);
+      })
+      .catch(async (e: unknown) => {
+        process.stderr.write(`E2E_FAILED ${String(e)}\n`);
+        await api?.stop();
+        endProcess(1);
+      });
+  });
+  win.webContents.once('did-fail-load', () => endProcess(1));
+}
+
+/**
+ * Ends the process with a non-zero code a moment later. Calling app.exit(code) while the browser process is still starting up
+ * intermittently crashed Electron on Windows (access violation 0xC0000005 or a breakpoint) in about 1 of 100 isolated runs, which turned a
+ * deliberate refusal into a crash exit code (risk R-104). With this short delay, 600 consecutive isolated runs of the same refusal
+ * all exited with code 1 (before: 5 of 400 crashed). It is a mitigation for a start-up race inside Electron, not a documented guarantee.
+ */
+function endProcess(code: number): void {
+  setTimeout(() => app.exit(code), 500);
 }
 
 function assertTrusted(event: IpcMainInvokeEvent): void {
@@ -418,7 +478,7 @@ async function runPdfSmoke(): Promise<void> {
   } catch (e) {
     process.stderr.write(`PDF_FAILED ${String(e)}
 `);
-    app.exit(1);
+    endProcess(1);
   }
 }
 
@@ -468,14 +528,14 @@ if (!app.requestSingleInstanceLock()) {
       const message = err instanceof Error ? err.message : String(err);
       if (smoke) {
         process.stderr.write(`SMOKE_FAILED could not start the local service: ${message}\n`);
-        app.exit(1);
+        endProcess(1);
         return;
       }
       dialog.showErrorBox(
         'CommerceBill Desktop could not start',
         `The local service failed to start. No data was changed.\n\n${message}`,
       );
-      app.exit(1);
+      endProcess(1);
       return;
     }
 

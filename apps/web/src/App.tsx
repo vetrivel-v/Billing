@@ -24,7 +24,8 @@ import { ProductFormPage } from './products/ProductFormPage.js';
 import { ProductsPage } from './products/ProductsPage.js';
 import { MODULES, visibleModules } from './nav.js';
 import { SetupWizard } from './setup/SetupWizard.js';
-import { BootingPage, DashboardPage, ModulePage, NotFoundPage, UnreachablePage } from './pages.js';
+import { DashboardPage } from './dashboard/DashboardPage.js';
+import { BootingPage, ModulePage, NotFoundPage, UnreachablePage } from './pages.js';
 
 /** A built module's screens, shown only to users holding the module's permission (the server still enforces it). */
 function Guarded({ module, children }: { module: string; children: React.ReactNode }) {

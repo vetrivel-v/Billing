@@ -5,6 +5,7 @@ import type {
   BackupReadinessResponse,
   BackupStatusResponse,
   BackupVerificationView,
+  DashboardSummaryResponse,
   RestoreInspectResponse,
   RestoreResultResponse,
   ApiErrorBody,
@@ -566,3 +567,6 @@ export const restoreBackup = (
   token: string,
   body: { sourceId: string; passphrase: string; confirmation: string },
 ): Promise<RestoreResultResponse> => callApi('POST', '/backup/restore', { token, body });
+
+export const getDashboardSummary = (token: string): Promise<DashboardSummaryResponse> =>
+  callApi('GET', '/dashboard/summary', { token });

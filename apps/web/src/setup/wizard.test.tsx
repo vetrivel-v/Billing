@@ -102,7 +102,7 @@ describe('launch', () => {
     expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
     // Honest about what setup does not cover
     expect(screen.getByText(/Bank account and UPI/)).toBeTruthy();
-    expect(screen.getByText(/no backups are active yet/)).toBeTruthy();
+    expect(screen.getByText(/no backup exists until you create one/)).toBeTruthy();
   });
 
   it('shows the sign-in page, not the wizard, when setup is complete', async () => {

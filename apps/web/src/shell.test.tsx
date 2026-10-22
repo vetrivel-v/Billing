@@ -135,7 +135,6 @@ describe('signing in', () => {
     expect(screen.getByText('Welcome, Asha Rao.')).toBeTruthy();
     expect(screen.getByText('Accountant, Viewer/Auditor')).toBeTruthy();
     expect(screen.getAllByText('Test Traders').length).toBeGreaterThan(0);
-    expect(screen.getByText('Business figures are not available yet')).toBeTruthy();
 
     // the session token is only ever sent as an Authorization header, and only in memory
     const me = calls.find((c) => c.path === '/auth/me')!;
@@ -422,12 +421,23 @@ describe('sign-out, expiry and revocation', () => {
       vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
     });
 
+    /**
+     * The session watcher registers its interval in an effect that runs AFTER the Dashboard is on screen. Advancing the fake clock before
+     * it is registered advances nothing, so wait until a fake timer exists (R-104: under load the effect could run late and the
+     * sign-out never happened).
+     */
+    const timersArmed = () =>
+      waitFor(() => {
+        if (vi.getTimerCount() === 0) throw new Error('the session timers are not registered yet');
+      });
+
     it('signs out locally when the absolute session lifetime passes', async () => {
       const me = meFor({ sessionExpiresAt: new Date(Date.now() + 60_000).toISOString() });
       installFakeApi({ ...session, 'GET /auth/me': () => ({ status: 200, body: me }) });
       renderApp();
       await signIn();
       await screen.findByRole('heading', { name: 'Dashboard' });
+      await timersArmed();
       await act(async () => {
         vi.advanceTimersByTime(75_000);
       });
@@ -442,6 +452,7 @@ describe('sign-out, expiry and revocation', () => {
       renderApp();
       await signIn();
       await screen.findByRole('heading', { name: 'Dashboard' });
+      await timersArmed();
       await act(async () => {
         vi.advanceTimersByTime(150_000);
       });
@@ -457,6 +468,7 @@ describe('sign-out, expiry and revocation', () => {
       renderApp();
       await signIn();
       await screen.findByRole('heading', { name: 'Dashboard' });
+      await timersArmed();
       const before = calls.filter((c) => c.path === '/auth/me').length;
       for (let i = 0; i < 6; i++) {
         await act(async () => {
@@ -481,6 +493,7 @@ describe('sign-out, expiry and revocation', () => {
       await signIn();
       await screen.findByRole('heading', { name: 'Dashboard' });
       revoked = true;
+      await timersArmed();
       await act(async () => {
         fireEvent.keyDown(window, { key: 'a' });
         vi.advanceTimersByTime(120_000);

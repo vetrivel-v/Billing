@@ -181,7 +181,7 @@ const PROBLEM_TEXT: Record<string, string> = {
     'Invoice numbering is not set up for demo invoices. Ask your administrator.',
   INSUFFICIENT_STOCK: 'There is not enough stock for this item.',
   PRODUCTION_GATE_NOT_MET:
-    'Production billing is unavailable. Backup and restore verification is required first.',
+    'Real billing is not available yet: the production checklist on the Tax page is not met.',
   MODE_MISMATCH:
     'This business is no longer in demo billing mode, so demo invoices cannot be posted.',
   OPERATION_ID_REUSED:

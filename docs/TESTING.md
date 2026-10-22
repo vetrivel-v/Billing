@@ -35,3 +35,11 @@ Additional directories now in use: `tests/unit` (catalogue checks), `tests/migra
 `npm run verify:phase0` runs: schema validate, client generate, type-check, lint, format check, unit,
 integration, build. Later phases extend this with e2e, accounting balance, inventory reconciliation, migration
 and backup/restore checks (spec section 9).
+
+## End-to-end and milestone checks (Task 1.18)
+
+- `tests/integration/fub-electron.int.test.ts`: First Usable Billing in the real Electron app (see DEVELOPER_GUIDE). Real: main process, preload, renderer, API, PostgreSQL. Replaced: the native save, print and folder/file dialogs. Driven from the main process with `executeJavaScript`, not Playwright.
+- `tests/integration/fub-api.int.test.ts`: the dashboard summary and the permission matrix across the standard roles, derived from the permission catalogue and the route table.
+- `tests/integration/dashboard-real-api.int.test.tsx`: the Dashboard screen against the real API, including a sweep proving no screen shows raw technical wording when the service fails.
+- `tests/integration/fub-performance.int.test.ts`: a modest representative-data smoke test (measured, not a benchmark).
+- `tests/e2e/pdf-text.ts`: extracts the text of a Chromium-generated PDF so a test can prove what an invoice PDF says.

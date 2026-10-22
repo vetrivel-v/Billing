@@ -242,7 +242,8 @@ export function NewInvoicePage() {
       <div className="mb-4">
         <Alert tone="warning" title="DEMO MODE">
           Invoices created here are for testing and are not production invoices. They do not change
-          your stock. Production billing unavailable: backup and restore verification is required.
+          your stock. Real billing is switched on separately, from the Tax page, once its checklist
+          is met.
         </Alert>
       </div>
 

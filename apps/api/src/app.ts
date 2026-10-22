@@ -21,6 +21,7 @@ import { registerInventoryRoutes } from './inventory-routes.js';
 import { registerInvoiceRoutes } from './invoice-routes.js';
 import { registerPaymentRoutes } from './payment-routes.js';
 import { registerBackupRoutes } from './backup-routes.js';
+import { registerDashboardRoutes } from './dashboard-routes.js';
 import { registerProductRoutes } from './product-routes.js';
 import { registerTaxRoutes } from './tax-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
@@ -341,6 +342,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
       }),
     );
+    await registerDashboardRoutes(app, {
+      prisma: deps.prisma,
+      taxConfig: taxConfigService,
+      backup: backupService,
+      clock: deps.auth?.clock,
+    });
     await registerPaymentRoutes(
       app,
       createPaymentService({

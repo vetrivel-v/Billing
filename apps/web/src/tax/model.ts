@@ -20,7 +20,7 @@ export const REQUIREMENT_LABEL: Record<string, string> = {
   TAX_REVIEW_CURRENT: 'The tax configuration has been reviewed and has not changed since',
   SELLER_REGISTERED_VALID: 'The business is a regular GST-registered seller with a valid GSTIN',
   HSN_SAC_POLICY: 'An HSN/SAC policy is in force',
-  BACKUP_RESTORE_VERIFIED: 'A backup has been restored and verified (not available yet)',
+  BACKUP_RESTORE_VERIFIED: 'A backup has been restored and verified (within the last 30 days)',
 };
 
 export const SELLER_PROBLEM_LABEL: Record<string, string> = {

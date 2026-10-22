@@ -144,7 +144,7 @@ export function InvoicesPage() {
         ) : (
           <EmptyState title="No invoices yet">
             {canCompose
-              ? 'Choose New invoice to create the first one. Until backup and restore are verified, invoices are demo invoices.'
+              ? 'Choose New invoice to create the first one. Invoices are demo invoices until real billing is switched on.'
               : 'No invoice has been posted yet.'}
           </EmptyState>
         )

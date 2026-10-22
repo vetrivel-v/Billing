@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { ApiError, getInvoice } from '../api.js';
 import { useAuth } from '../auth.js';
 import { stateName } from '../customers/model.js';
+import { formatWhen } from '../backup/model.js';
 import { describeFailure } from '../messages.js';
 import { formatRate, formatRupees, problemText } from './model.js';
 import { PaymentSection } from '../payments/PaymentSection.js';
@@ -69,7 +70,7 @@ export function InvoiceDetailPage() {
     <>
       <PageHeader
         title={`Invoice ${inv.documentNumber}`}
-        description={`Posted ${new Date(inv.createdAt).toLocaleString()} by ${inv.createdByName}`}
+        description={`Posted ${formatWhen(inv.createdAt)} by ${inv.createdByName}`}
         actions={
           <>
             <Button variant="secondary" onClick={() => navigate(`/billing/${inv.id}/print`)}>
@@ -144,8 +145,7 @@ export function InvoiceDetailPage() {
           <p className="text-sm font-medium text-slate-900">{state(inv.placeOfSupply.stateCode)}</p>
           <p className="text-xs text-slate-600">
             {inv.placeOfSupply.source === 'USER_OVERRIDE' ? 'Chosen by' : 'Confirmed by'}{' '}
-            {inv.placeOfSupply.confirmedByName} on{' '}
-            {new Date(inv.placeOfSupply.confirmedAt).toLocaleString()}
+            {inv.placeOfSupply.confirmedByName} on {formatWhen(inv.placeOfSupply.confirmedAt)}
           </p>
           <p className="mt-1 text-xs text-slate-600">
             {taxColumns === 'INTER'

@@ -119,7 +119,7 @@ describe('tax configuration through the real UI, API and database', () => {
     const reqs = within(screen.getByRole('list', { name: 'Production billing requirements' }));
     expect(reqs.getAllByText('Not met').length).toBe(3); // review, seller, backup; the HSN policy is met by default
     expect(
-      reqs.getByText(/A backup has been restored and verified \(not available yet\)/),
+      reqs.getByText(/A backup has been restored and verified \(within the last 30 days\)/),
     ).toBeTruthy();
     expect(screen.getByText('Not reviewed')).toBeTruthy();
     const table = screen.getByRole('table', { name: 'Tax categories and effective-dated rates' });
