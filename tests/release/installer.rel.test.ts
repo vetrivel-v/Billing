@@ -263,7 +263,7 @@ describe('install, run, close, uninstall, reinstall (real installer)', () => {
 
   it('closing the window stops the service and the database cleanly and leaves nothing running', async () => {
     const mainPid = status()!.mainPid as number;
-    await closeGracefully(mainPid);
+    await closeGracefully(mainPid, 90_000, evidence);
     await waitDiag(
       'every process to end',
       () => (processesUnder(installDir).length === 0 ? true : undefined),
@@ -290,7 +290,7 @@ describe('install, run, close, uninstall, reinstall (real installer)', () => {
       180_000,
     );
     expect(st.clusterId).toBe(firstClusterId);
-    await closeGracefully(st.mainPid as number);
+    await closeGracefully(st.mainPid as number, 90_000, evidence);
     await waitDiag(
       'every process to end',
       () => (processesUnder(installDir).length === 0 ? true : undefined),
@@ -332,7 +332,7 @@ describe('install, run, close, uninstall, reinstall (real installer)', () => {
     );
     expect(again.clusterId).toBe(firstClusterId);
     expect(again.install).toBe('existing');
-    await closeGracefully(again.mainPid as number);
+    await closeGracefully(again.mainPid as number, 90_000, evidence);
     await waitDiag(
       'every process to end',
       () => (processesUnder(installDir).length === 0 ? true : undefined),
@@ -367,7 +367,7 @@ describe('install, run, close, uninstall, reinstall (real installer)', () => {
     );
     expect(st.clusterId).toBe(firstClusterId);
     expect(st.upgraded).toBe(false);
-    await closeGracefully(st.mainPid as number);
+    await closeGracefully(st.mainPid as number, 90_000, evidence);
     await waitDiag(
       'every process to end',
       () => (processesUnder(installDir).length === 0 ? true : undefined),

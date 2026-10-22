@@ -141,17 +141,36 @@ export function launch(exe: string, env: Record<string, string>): ChildProcess {
   return spawn(exe, [], { env: e, detached: true, stdio: 'ignore' });
 }
 
-/** Closes the main window the way the close button does, and waits for the program to end. */
-export async function closeGracefully(mainPid: number, ms = 90_000): Promise<void> {
-  ps(
-    `$p = Get-Process -Id ${mainPid} -ErrorAction SilentlyContinue; if ($p) { [void]$p.CloseMainWindow() }`,
-  );
+/**
+ * Closes the main window the way the close button does, and waits for the program to end. The runtime status says "running" as soon as the
+ * database and service are up, which is slightly BEFORE the window opens; a person clicks the close button again if nothing happened, so the
+ * request is repeated every few seconds until the program ends.
+ */
+export async function closeGracefully(
+  mainPid: number,
+  ms = 90_000,
+  evidence?: () => string,
+): Promise<void> {
   const end = Date.now() + ms;
+  let nextClose = 0;
   while (Date.now() < end) {
     if (!allProcesses().some((r) => r.pid === mainPid)) return;
+    if (Date.now() >= nextClose) {
+      ps(
+        `$p = Get-Process -Id ${mainPid} -ErrorAction SilentlyContinue; if ($p) { [void]$p.CloseMainWindow() }`,
+      );
+      nextClose = Date.now() + 5_000;
+    }
     await sleep(500);
   }
-  throw new Error('the application did not close');
+  throw new Error(
+    `the application did not close${
+      evidence
+        ? `
+${evidence()}`
+        : ''
+    }`,
+  );
 }
 
 export function killTree(pid: number): void {
