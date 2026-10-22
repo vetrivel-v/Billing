@@ -85,6 +85,19 @@ export interface DesktopBridge {
   saveInvoicePdf(invoice: InvoiceView): Promise<DocumentOutputResult>;
   /** Opens the operating system's print dialog for the invoice. Never prints silently. */
   printInvoice(invoice: InvoiceView): Promise<DocumentOutputResult>;
+  /** Opens the operating system's folder chooser for backups. The folder is registered with the local service by the shell; the renderer only learns its display name. */
+  chooseBackupDestination(): Promise<BackupChoiceResult>;
+  /** Opens the operating system's file chooser for a backup to restore. The renderer receives an opaque id and the file name, never a path. */
+  chooseRestoreFile(): Promise<BackupChoiceResult>;
+}
+
+/** The outcome of a native backup folder/file chooser. Never carries a path. */
+export interface BackupChoiceResult {
+  status: 'chosen' | 'cancelled' | 'failed';
+  /** Display name of the chosen folder, or file name of the chosen backup. */
+  label?: string;
+  /** For a restore file: an opaque id the local service understands. */
+  sourceId?: string;
 }
 
 /** Application version reported by health checks until release tooling injects it (Phase 6). */
@@ -684,4 +697,109 @@ export interface CustomerReceivableResponse {
   customer: { id: string; code: string; name: string };
   totals: { invoiced: string; paid: string; outstanding: string };
   invoices: ReceivableInvoiceRow[];
+}
+
+// ------------------------------------------------------------------------------------------------ backup and recovery (Task 1.17)
+
+export interface BackupVerificationView {
+  id: string;
+  result: 'PASS' | 'FAIL';
+  verifiedAt: string;
+  engineVersion: string;
+  /** Names and pass/fail only: never data. */
+  checks: { name: string; ok: boolean }[];
+}
+
+export interface BackupView {
+  id: string;
+  kind: 'MANUAL' | 'PRE_RESTORE';
+  /** The file name only: never the folder path. */
+  fileName: string;
+  destinationLabel: string | null;
+  sizeBytes: number;
+  createdAt: string;
+  appVersion: string;
+  schemaVersion: string;
+  backupFormat: number;
+  /** False once retention removed the file. */
+  fileAvailable: boolean;
+  /** The latest verified-restore result, or null when the backup has never been verified. */
+  verification: BackupVerificationView | null;
+}
+
+export type RecoveryGateReason =
+  | 'CURRENT'
+  | 'NO_VERIFIED_BACKUP'
+  | 'LATEST_VERIFICATION_FAILED'
+  | 'VERIFICATION_ENGINE_CHANGED'
+  | 'SCHEMA_CHANGED'
+  | 'DATABASE_CHANGED'
+  | 'VERIFICATION_TOO_OLD';
+
+/** Whether a CURRENT verified-recovery record exists (the backup/restore requirement of the production gate). */
+export interface BackupRecoveryGate {
+  met: boolean;
+  reason: RecoveryGateReason;
+  verifiedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface BackupStatusResponse {
+  destination: { label: string } | null;
+  retentionKeep: number | null;
+  lastBackup: BackupView | null;
+  lastVerifiedAt: string | null;
+  gate: BackupRecoveryGate;
+  schemaVersion: string;
+  appVersion: string;
+  maxVerificationAgeDays: number;
+}
+
+export interface BackupHistoryResponse {
+  backups: BackupView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface BackupCreateResponse {
+  backup: BackupView;
+  verification: BackupVerificationView | null;
+}
+
+export interface RestoreInspectResponse {
+  fileName: string;
+  createdAt: string;
+  organizationName: string;
+  sameOrganization: boolean;
+  appVersion: string;
+  schemaVersion: string;
+  schemaCompatible: boolean;
+  sameDatabase: boolean;
+  kind: 'MANUAL' | 'PRE_RESTORE';
+  tables: number;
+  rows: number;
+  verificationStatus: 'PASS' | 'FAIL' | 'NOT_VERIFIED';
+}
+
+export interface RestoreResultResponse {
+  status: 'RESTORED';
+  restoredBackupId: string;
+  restoredFromCreatedAt: string;
+  safetyBackupId: string;
+  productionGateMet: boolean;
+  /** False if the backup history could not be copied into the restored database (the restore itself succeeded). */
+  historyCarried: boolean;
+}
+
+/** One line of the production readiness summary. */
+export interface ReadinessItem {
+  code: string;
+  met: boolean;
+}
+
+export interface BackupReadinessResponse {
+  mode: BillingMode;
+  eligible: boolean;
+  items: ReadinessItem[];
 }

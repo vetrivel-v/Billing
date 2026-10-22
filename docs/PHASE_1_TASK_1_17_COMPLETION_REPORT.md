@@ -1,0 +1,64 @@
+# Phase 1 - Task 1.17 Completion Report: Production Backup and Verified Restore
+
+**A verified backup does not enable production billing. R-040 stays open; the production gate also needs the tax review, a valid seller registration and the HSN/SAC policy, and switching to PRODUCTION stays a separate, deliberate step.**
+
+## Visible functionality achieved
+
+Settings, Backup & Recovery: choose a backup folder (an operating-system dialog), create an encrypted backup with a passphrase you type twice (with a clear "lost passphrase means lost backup" warning), and have it **verified** by restoring it into a separate temporary database and checking it. See the history with each backup's verification state, verify any backup again, set how many verified backups to keep, and see the production readiness panel (tax review, seller GST, HSN/SAC policy, backup and recovery). An administrator can open a backup, see what it holds, and restore it after typing `RESTORE`; a verified safety backup of the current data is made first and nothing changes if any step fails.
+
+## Requirements checked
+
+T117-01 to T117-12 in REQUIREMENTS_MATRIX; the exact Task 1.17 acceptance criteria and the 30-section brief; ADR-0027; R-031 closed, R-011 mitigated, R-036 re-assessed; R-097 to R-103 added.
+
+## Design in one paragraph
+
+A backup is one `*.cbbackup` file: AES-256-GCM in 1 MiB chunks, a key derived by scrypt from the user's passphrase, a random salt and nonce prefix per file, the header and a final-chunk flag authenticated, so a wrong passphrase, any changed byte, a removed, reordered or appended chunk and a truncated file are all refused. Inside: a manifest and one data file per table taken under a single `REPEATABLE READ` snapshot (the application keeps running; sessions are excluded). Verification restores into an isolated database (migrate, then load), rebuilds the stock projection from the ledger (R-080), runs 22 integrity checks, compares the re-exported content with the manifest, persists PASS or FAIL in append-only tables and removes the isolated database. The production gate reads that record (latest PASS, current engine, schema and database, at most 30 days), never a boolean. The renderer never touches the file system: folder and file are chosen through argument-free IPC and registered with the service over a second secret.
+
+## Points to review
+
+- **A backup protects only if it is kept off this computer (R-097) and the passphrase is kept safe (R-098).** The product cannot enforce either; the screens, ADMIN_GUIDE and DISASTER_RECOVERY say so.
+- A restore keeps the previous database on disk, renamed (R-099), and signs everyone out (R-100). There is no clean-up tool yet.
+- No scheduled/automatic backups, cloud storage, point-in-time recovery, passphrase recovery or attachments in backups (R-102, R-103). Cross-version restore is refused.
+- Verification restores on the same machine: it proves the backup is readable and consistent, not that it survives a disk loss.
+- **Defects the tests found and that were fixed:** a foreign-key check query aggregated into a string (cast added); a temporary table could not be created inside a read-only transaction; the fixed test clock produced identical timestamps, so "latest" used an ambiguous order (a monotonic `seq` column now orders everything); restore silently dropped history rows because serial sequences were not advanced after loading explicit values (`setval` over every serial column); a restored database lost earlier history (the whole history is now carried across the swap); an unhandled error when the lock connection was terminated by the database swap (handled); a minimum-size rule rejected tiny valid archives; **a restore failed AFTER the database swap** when the backup history carried an author who did not exist in the restored database (the administrator who was restoring had been created after the backup): the API answered 500 "No data was changed" although the data had been replaced. History authors are now optional in the two new tables (a carried-over entry whose author is unknown here has no author, never a guess), everything after the swap is best effort and reported (`historyCarried`), and the screen test restores through the real UI with exactly this situation.
+- **The final gate failed intermittently on unrelated tests before it passed.** Repeated `npm run verify:phase0` attempts on the committed tree failed on a different unrelated test each time (Electron exiting with an access violation instead of exit code 1, a fake-timer unit test hitting its timeout, a jsdom screen test not finding text in time, a fixture hook timing out); each of those tests passes alone and passed in an earlier full coverage run, and the machine had about 1 GB of free memory. Nothing was loosened, retried automatically or given a longer timeout. Recorded as R-104 (load-sensitive tests, open); the final run that counts is the one reported in the hand-off message.
+- Visual review: see below.
+
+## Electron check (item 24)
+
+`tests/integration/backup-electron.int.test.ts` runs the **real Backup & Recovery screens in the real Electron renderer** served from `app://`, against the real API and database, through the real IPC and control channel: sign in, Settings, choose the folder, create an encrypted backup with verification, open it for restore (without restoring). Only the two native dialogs are replaced by hooks. The result asserts the six bridge methods, that no path reaches the page, that the passphrase and the control secret appear nowhere in the page or the service output, and that exactly one backup file was written.
+
+**Not done and remaining for a manual installer smoke test:** the native folder and file dialogs themselves; a real removable/external drive (**not tested; no such claim is made**); the installed (packaged) application (R-090); a physical printer (R-093).
+
+## Mutation checks
+
+Each defect was introduced, the named tests were required to fail, and the source was restored and verified identical:
+
+| Defect introduced                                            | Result                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The authenticated final-chunk flag is ignored                | Killed (truncation to a chunk boundary was accepted until the unit test failed)                                                                                                                                                                                                                                               |
+| The container entry-name allow-list is opened (`true`)       | Killed (two unit tests)                                                                                                                                                                                                                                                                                                       |
+| The gate ignores a failed verification                       | Killed (gate test and retention test)                                                                                                                                                                                                                                                                                         |
+| The control secret is not checked                            | Killed (control-route test)                                                                                                                                                                                                                                                                                                   |
+| Maintenance mode is switched off during a restore            | Killed (active restore test)                                                                                                                                                                                                                                                                                                  |
+| Retention removes every file instead of keeping the newest N | Killed (retention test)                                                                                                                                                                                                                                                                                                       |
+| The manifest checksum is not compared with the data file     | Killed (hostile-archive test)                                                                                                                                                                                                                                                                                                 |
+| Restored-content identity is always "ok"                     | **Survived the first time.** No test could make the restored content differ from the manifest while every other check passed. A test now builds a consistent archive whose rows carry a field the database does not have (and aligns the stored fingerprint with it, so only the content differs): the mutation is now killed |
+
+## Visual review
+
+Run against the real API and the real engine on fictional data, through a throwaway page that served the built web bundle with a stand-in desktop bridge (deleted afterwards), at 1000 px and 1280 px (the Settings layout is one column below 1280 px and two columns from 1280 px; measured: no horizontal overflow at 1280 px). States inspected: first visit (no folder, no backups, readiness unmet), folder chosen (display name only), too-short and mismatching passphrases, creation in progress, created and verified, **created but failed verification** (the failing check is named and marked), history with verification state, wrong-passphrase restore message, the restore details with the "this replaces your current data" warning, an Accountant's read-only view (no create, verify, folder, retention save or restore) and the Dashboard module list.
+
+Found and fixed during the review:
+
+- **A restore ended on a silent sign-out.** The restore worked, but the next request failed because sessions are not restored, so the person was returned to the sign-in page with "Your session has ended" and never saw that the restore had succeeded. The screen now goes straight to the sign-in page with "The backup was restored. Everyone is signed out after a restore: sign in again. Real billing stays off until a new backup is verified." (asserted by a real-API test).
+- Five check names (`archive_authenticated`, `archive_readable`, `manifest_valid`, `checksums_match`, `restore_load`) were shown raw in the failed-verification list; they now have plain labels.
+- The review also exposed a **real defect** that was not visual (see Points to review): a restore carried the backup history into the restored database by author, and failed after the database swap when the author did not exist there.
+
+## Tests
+
+1283 tests passed in 86 files; coverage 93.6% statements / 87.8% branches / 92.7% functions / 95.2% lines (thresholds 80/70/80/80 unchanged). New or changed tests in this task: `packages/backup/src/backup.test.ts` (13: encryption round trips and tampering, container hardening, manifest, passphrase rules, trigger derivation), `apps/desktop/src/backup-ipc.test.ts` (4) and the updated bridge/IPC guard-rail tests, `tests/integration/backup.int.test.ts` (18), `tests/integration/backup-restore.int.test.ts` (6), `tests/integration/backup-ui-real-api.int.test.tsx` (7, including a full restore from the screen), `tests/integration/backup-electron.int.test.ts` (1), `tests/migration/backup-recovery.int.test.ts` (3, including the upgrade of a populated Task 1.16 database). Existing tests changed: the desktop bridge now has six methods, the logical-dump table count is 32, Settings is no longer "Coming soon".
+
+## Commands executed
+
+`prisma generate`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npx vitest run --coverage`, `npm run build`, `npm audit`, `npm run verify:phase0` (all 8 gates, on the final committed tree).

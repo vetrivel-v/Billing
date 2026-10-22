@@ -33,3 +33,7 @@ Until backup and restore are verified, only demo invoices exist, so payments are
 
 - **Payments** lists recorded payments (search, method, type and date filters).
 - **Receivables** shows, per customer, what was invoiced, paid and is outstanding; open a customer to see each invoice and whether it is unpaid, partly paid or paid. Choose **Demo (not real)** to see demo figures, which are kept apart from production.
+
+## Real billing needs a verified backup
+
+Real (production) invoices stay unavailable until, among other things, a recent backup has been **verified** (restored into a separate test database and checked) in Settings, Backup & Recovery. Verifying a backup does not switch real billing on; that is a separate step on the Tax page, and the tax rates must have been reviewed by a qualified professional first. See [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md).

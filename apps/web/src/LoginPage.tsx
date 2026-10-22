@@ -14,6 +14,10 @@ const NOTICES: Record<SignedOutNotice, { tone: 'info' | 'warning'; text: string 
     tone: 'info',
     text: 'Setup is complete. Sign in with the administrator account you just created.',
   },
+  restored: {
+    tone: 'info',
+    text: 'The backup was restored. Everyone is signed out after a restore: sign in again. Real billing stays off until a new backup is verified.',
+  },
   ended: {
     tone: 'warning',
     text: 'Your session has ended. It may have been signed out elsewhere or revoked by an administrator. Sign in again to continue.',

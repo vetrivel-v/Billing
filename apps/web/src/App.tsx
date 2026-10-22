@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router';
 import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
+import { BackupPage } from './backup/BackupPage.js';
+import { SettingsPage } from './backup/SettingsPage.js';
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
 import { CustomerReceivablePage, ReceivablesPage } from './payments/ReceivablesPage.js';
@@ -29,6 +31,21 @@ function Guarded({ module, children }: { module: string; children: React.ReactNo
   const { can } = useAuth();
   const entry = MODULES.find((m) => m.key === module);
   if (entry?.permission && !can(entry.permission)) return <ModulePage moduleKey={module} />;
+  return <>{children}</>;
+}
+
+/** A screen needing one more permission than its module: others see the module's "not available" page. */
+function PermissionGate({
+  permission,
+  moduleKey,
+  children,
+}: {
+  permission: string;
+  moduleKey: string;
+  children: React.ReactNode;
+}) {
+  const { can } = useAuth();
+  if (!can(permission)) return <ModulePage moduleKey={moduleKey} />;
   return <>{children}</>;
 }
 
@@ -142,6 +159,24 @@ function Shell() {
           }
         />
         <Route
+          path="/settings"
+          element={
+            <Guarded module="settings">
+              <SettingsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/settings/backup"
+          element={
+            <Guarded module="settings">
+              <PermissionGate permission="backup.history.read" moduleKey="settings">
+                <BackupPage />
+              </PermissionGate>
+            </Guarded>
+          }
+        />
+        <Route
           path="/tax"
           element={
             <Guarded module="tax">
@@ -230,7 +265,8 @@ function Shell() {
             m.key !== 'billing' &&
             m.key !== 'payments' &&
             m.key !== 'receivables' &&
-            m.key !== 'tax',
+            m.key !== 'tax' &&
+            m.key !== 'settings',
         ).map((m) => (
           <Route key={m.key} path={m.path} element={<ModulePage moduleKey={m.key} />} />
         ))}

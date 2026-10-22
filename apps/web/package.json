@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@commercebill/backup": "^0.0.1",
     "@commercebill/customers": "^0.0.1",
     "@commercebill/document-engine": "^0.0.1",
     "@commercebill/inventory-engine": "^0.0.1",

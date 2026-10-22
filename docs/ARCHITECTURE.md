@@ -171,7 +171,7 @@ No blocking contradiction was found. Tensions that need decisions in later phase
    licensing notices and service lifecycle are Phase 6 work (ADR-0003, risk R-030).
 2. **Backups need `pg_dump`/`pg_restore`, which the embedded binaries do not include** (verified: only
    `initdb`, `pg_ctl`, `postgres` and libraries ship). Phase 1 must either bundle the client tools or
-   implement a verified logical export (risk R-031). This must be resolved before Phase 1 backup work.
+   implement a verified logical export (risk R-031). Resolved in Task 1.17: see ADR-0027 and packages/backup.
 3. **Loopback API is still reachable by other local processes/users.** Loopback-only is necessary but not
    sufficient; Phase 1 needs per-session authentication and a per-launch secret between the Electron
    shell and the API (risk R-032).

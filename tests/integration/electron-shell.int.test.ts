@@ -105,6 +105,8 @@ describe('Electron shell supplies the launch secret to the API (P1-SEC-01)', () 
     // Task 1.15: the bridge is exactly these four methods (no fs, shell, path or navigation capability), and the document
     // channels reject an invalid payload from the real renderer (no dialog, no file, no echo).
     expect(result.bridgeKeys).toEqual([
+      'chooseBackupDestination',
+      'chooseRestoreFile',
       'getApiAccess',
       'getAppInfo',
       'printInvoice',

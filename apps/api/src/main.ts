@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createPrismaClient } from '@commercebill/database';
 import { EnvValidationError, parseEnv } from '@commercebill/validation';
 import { buildApp } from './app.js';
@@ -16,7 +18,21 @@ async function main(): Promise<void> {
   }
 
   const prisma = createPrismaClient(env.DATABASE_URL);
-  const app = await buildApp({ env, prisma, launchSecret: env.LAUNCH_SECRET });
+  // Dev layout: apps/api/dist/main.js -> <repo>/prisma/migrations. The packaged layout is Phase 6 work (MIGRATIONS_DIR overrides it).
+  const migrationsDir =
+    process.env.MIGRATIONS_DIR ??
+    resolve(fileURLToPath(import.meta.url), '..', '..', '..', '..', 'prisma', 'migrations');
+  const app = await buildApp({
+    env,
+    prisma,
+    launchSecret: env.LAUNCH_SECRET,
+    backup: {
+      databaseUrl: env.DATABASE_URL,
+      migrationsDir,
+      // The desktop shell's own secret (never sent to the renderer). Absent = the shell cannot choose folders or files.
+      controlSecret: process.env.CONTROL_SECRET || undefined,
+    },
+  });
 
   const shutdown = async (): Promise<void> => {
     await app.close();

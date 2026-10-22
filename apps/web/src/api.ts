@@ -1,5 +1,12 @@
 import type {
   ApiAccess,
+  BackupCreateResponse,
+  BackupHistoryResponse,
+  BackupReadinessResponse,
+  BackupStatusResponse,
+  BackupVerificationView,
+  RestoreInspectResponse,
+  RestoreResultResponse,
   ApiErrorBody,
   DatabaseHealthResponse,
   HealthResponse,
@@ -516,3 +523,46 @@ export const getCustomerReceivable = (
     `/receivables/customers/${encodeURIComponent(customerId)}?isDemo=${String(isDemo)}`,
     { token },
   );
+
+// ---- Backup and recovery -------------------------------------------------------------------------------------------
+
+export const getBackupStatus = (token: string): Promise<BackupStatusResponse> =>
+  callApi('GET', '/backup/status', { token });
+
+export const getBackupReadiness = (token: string): Promise<BackupReadinessResponse> =>
+  callApi('GET', '/backup/readiness', { token });
+
+export const listBackups = (
+  token: string,
+  q: { limit: number; offset: number },
+): Promise<BackupHistoryResponse> =>
+  callApi('GET', `/backup/history?limit=${String(q.limit)}&offset=${String(q.offset)}`, { token });
+
+/** The passphrase travels only in this request body, over the loopback connection; it is never put in a URL. */
+export const createBackup = (
+  token: string,
+  body: { passphrase: string; passphraseConfirm: string; verifyNow: boolean },
+): Promise<BackupCreateResponse> => callApi('POST', '/backup', { token, body });
+
+export const verifyBackup = (
+  token: string,
+  id: string,
+  body: { passphrase: string },
+): Promise<{ verification: BackupVerificationView }> =>
+  callApi('POST', `/backup/${encodeURIComponent(id)}/verify`, { token, body });
+
+export const putBackupRetention = (
+  token: string,
+  retentionKeep: number | null,
+): Promise<{ retentionKeep: number | null }> =>
+  callApi('PUT', '/backup/retention', { token, body: { retentionKeep } });
+
+export const inspectRestore = (
+  token: string,
+  body: { sourceId: string; passphrase: string },
+): Promise<RestoreInspectResponse> => callApi('POST', '/backup/restore/inspect', { token, body });
+
+export const restoreBackup = (
+  token: string,
+  body: { sourceId: string; passphrase: string; confirmation: string },
+): Promise<RestoreResultResponse> => callApi('POST', '/backup/restore', { token, body });

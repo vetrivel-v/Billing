@@ -540,10 +540,10 @@ describe('permission-driven navigation', () => {
     for (const label of ['Customers', 'Products', 'Inventory', 'Billing', 'Settings']) {
       expect(nav.textContent).toContain(label);
     }
-    expect(within(nav).getAllByText('Coming soon')).toHaveLength(1); // only Settings is still to come
+    expect(within(nav).queryAllByText('Coming soon')).toHaveLength(0); // every module is built
   });
 
-  it('a typed path without permission says so; with permission says Coming soon; unknown is not found', async () => {
+  it('a typed path without permission says so; with permission opens the screen; unknown is not found', async () => {
     withPermissions(['customer.read']);
     renderApp('/products');
     await signIn();
@@ -552,7 +552,7 @@ describe('permission-driven navigation', () => {
     withPermissions(['org.settings.read']);
     renderApp('/settings');
     await signIn();
-    expect(await screen.findByRole('heading', { name: 'Coming soon' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeTruthy();
     cleanup();
     withPermissions([]);
     renderApp('/nowhere');

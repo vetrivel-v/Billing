@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@commercebill/auth": "^0.0.1",
+    "@commercebill/backup": "^0.0.1",
     "@commercebill/customers": "^0.0.1",
     "@commercebill/database": "^0.0.1",
     "@commercebill/inventory-engine": "^0.0.1",

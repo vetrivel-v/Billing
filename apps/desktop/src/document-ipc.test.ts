@@ -113,9 +113,11 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
     'app:get-api-access',
     'document:save-invoice-pdf',
     'document:print-invoice',
+    'backup:choose-destination',
+    'backup:choose-restore-file',
   ]);
 
-  it('the preload exposes exactly four bridge methods, only through the four allowed channels', () => {
+  it('the preload exposes exactly six bridge methods, only through the six allowed channels', () => {
     const p = src('preload.ts');
     const channels = [...p.matchAll(/ipcRenderer\.invoke\('([^']+)'/g)].map((m) => m[1]!);
     expect(channels.sort()).toEqual([...ALLOWED].sort());
@@ -133,7 +135,14 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
       'webFrame',
     ])
       expect(p, forbidden).not.toContain(forbidden);
-    for (const key of ['getAppInfo', 'getApiAccess', 'saveInvoicePdf', 'printInvoice'])
+    for (const key of [
+      'getAppInfo',
+      'getApiAccess',
+      'saveInvoicePdf',
+      'printInvoice',
+      'chooseBackupDestination',
+      'chooseRestoreFile',
+    ])
       expect(p).toContain(`${key}:`);
   });
 
@@ -143,6 +152,8 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
     expect(registrations).toEqual([
       "'app:get-info'",
       "'app:get-api-access'",
+      'BACKUP_CHANNELS.chooseDestination',
+      'BACKUP_CHANNELS.chooseRestoreFile',
       'DOCUMENT_CHANNELS.savePdf',
       'DOCUMENT_CHANNELS.print',
     ]);
@@ -159,6 +170,28 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
     );
     expect(handler).toContain('if (!req.ok) throw');
     expect(m.match(/ipcMain\.on\(/g)).toBeNull(); // no fire-and-forget channels
+  });
+
+  it('the backup choosers take no renderer argument and check the sender before opening any dialog', () => {
+    const m = src('main.ts');
+    const fn = m.slice(
+      m.indexOf('function backupChooser'),
+      m.indexOf('ipcMain.handle(BACKUP_CHANNELS.chooseDestination'),
+    );
+    expect(fn).toContain('assertTrusted(event)');
+    expect(fn.indexOf('assertTrusted(event)')).toBeLessThan(fn.indexOf('chooseFolder('));
+    expect(fn.indexOf('assertTrusted(event)')).toBeLessThan(fn.indexOf('chooseBackupFile('));
+    expect(fn).not.toMatch(/payload|\.\.\.args|(?<![a-z])arg(?![a-z])/); // nothing from the renderer is used
+    expect(fn).toContain('controlSecret');
+    // the control secret is generated here and never handed to the renderer
+    const access = m.slice(
+      m.indexOf("ipcMain.handle('app:get-api-access'"),
+      m.indexOf("ipcMain.handle('app:get-api-access'") + 400,
+    );
+    expect(access).not.toContain('controlSecret');
+    const e = src('electron-backup.ts');
+    expect(e).toContain("'openDirectory'");
+    expect(e).not.toMatch(/writeFile|unlink|rm\(|readFile|child_process|shell\./);
   });
 
   it('the hidden render window is locked down: no JavaScript, sandboxed, every non-data request cancelled', () => {

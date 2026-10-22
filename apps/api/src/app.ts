@@ -20,6 +20,7 @@ import { registerCustomerRoutes } from './customer-routes.js';
 import { registerInventoryRoutes } from './inventory-routes.js';
 import { registerInvoiceRoutes } from './invoice-routes.js';
 import { registerPaymentRoutes } from './payment-routes.js';
+import { registerBackupRoutes } from './backup-routes.js';
 import { registerProductRoutes } from './product-routes.js';
 import { registerTaxRoutes } from './tax-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
@@ -27,6 +28,7 @@ import { createProductService } from '@commercebill/products';
 import { createTaxConfigService } from '@commercebill/tax-config';
 import { createInvoiceService } from '@commercebill/invoicing';
 import { createPaymentService } from '@commercebill/payments';
+import { createBackupService } from '@commercebill/backup';
 import { createNumberingService } from '@commercebill/numbering';
 import { createCustomerService } from '@commercebill/customers';
 import { registerSetupRoutes } from './setup-routes.js';
@@ -54,6 +56,19 @@ export interface AppDeps {
    * Absent = false, so production billing is refused. Tests inject a value to exercise the production paths in isolation.
    */
   backupRestoreVerified?: ((organizationId: string) => Promise<boolean>) | undefined;
+  /**
+   * Backup and verified restore (Task 1.17, ADR-0027). When present, the production gate's backup/restore fact comes from the
+   * recovery records (a CURRENT verified-restore PASS) and the backup routes are served. `controlSecret` is the desktop shell's own
+   * secret for choosing the backup folder and restore file: it is never given to the renderer.
+   */
+  backup?:
+    | {
+        databaseUrl: string;
+        migrationsDir: string;
+        controlSecret?: string | undefined;
+        maxVerificationAgeDays?: number | undefined;
+      }
+    | undefined;
   /** Global request limiter. Default 300 requests per minute. */
   globalRateLimit?: LoginRateLimit;
   /** Per-route limit for POST /auth/login. Default 10 requests per minute. */
@@ -139,6 +154,22 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       return reply.code(401).send(body);
     });
   }
+
+  // While an active restore swaps the database, business writes are refused (reads of /health and the backup status continue).
+  let maintenance = false;
+  app.addHook('onRequest', async (req, reply) => {
+    if (!maintenance) return;
+    const path = req.url.split('?')[0] ?? '';
+    if (req.method === 'GET' && (path.startsWith('/health') || path === '/backup/status')) return;
+    return reply.code(503).send({
+      error: {
+        code: ErrorCodes.DATABASE_UNAVAILABLE,
+        message: 'A restore is in progress. Nothing was changed. Try again in a moment.',
+        dataSaved: false,
+        correlationId: req.id,
+      },
+    });
+  });
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('x-correlation-id', req.id);
@@ -259,12 +290,43 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
       }),
     );
+    const backupService = deps.backup
+      ? createBackupService({
+          prisma: deps.prisma,
+          databaseUrl: deps.backup.databaseUrl,
+          migrationsDir: deps.backup.migrationsDir,
+          appVersion: APP_VERSION,
+          ...(deps.backup.maxVerificationAgeDays
+            ? { maxVerificationAgeDays: deps.backup.maxVerificationAgeDays }
+            : {}),
+          ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+          onMaintenance: (on) => {
+            maintenance = on;
+          },
+          reconnect: async () => {
+            await deps.prisma!.$disconnect();
+          },
+          logger: app.log,
+        })
+      : undefined;
+    // The production gate's backup/restore fact: a test may inject it; otherwise it is the recovery record, never a flag.
+    const backupFact =
+      deps.backupRestoreVerified ??
+      (backupService
+        ? async (organizationId: string) => (await backupService.recoveryGate(organizationId)).met
+        : undefined);
     const taxConfigService = createTaxConfigService({
       prisma: deps.prisma,
       appVersion: APP_VERSION,
       ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
-      ...(deps.backupRestoreVerified ? { backupRestoreVerified: deps.backupRestoreVerified } : {}),
+      ...(backupFact ? { backupRestoreVerified: backupFact } : {}),
     });
+    if (backupService)
+      await registerBackupRoutes(app, backupService, {
+        taxConfig: taxConfigService,
+        prisma: deps.prisma,
+        controlSecret: deps.backup?.controlSecret,
+      });
     await registerTaxRoutes(app, taxConfigService);
     await registerInvoiceRoutes(
       app,

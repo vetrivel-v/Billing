@@ -37,6 +37,8 @@ export interface ApiLaunchConfig {
   databaseUrl: string;
   logLevel?: string;
   nodeEnv?: string;
+  /** The shell's own secret for choosing the backup folder and restore file. Never given to the renderer. */
+  controlSecret?: string;
   /** Executable used to run the entry. In Electron this is process.execPath with ELECTRON_RUN_AS_NODE. */
   execPath?: string;
 }
@@ -67,6 +69,7 @@ export function buildApiSpawn(
     WEB_ORIGIN: config.webOrigin,
     DATABASE_URL: config.databaseUrl,
     LAUNCH_SECRET: config.secret,
+    ...(config.controlSecret ? { CONTROL_SECRET: config.controlSecret } : {}),
   });
   return { command: config.execPath ?? process.execPath, args: [config.entry], env };
 }

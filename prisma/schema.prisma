@@ -63,6 +63,8 @@ model Organization {
   hsnSacCodes               HsnSacCode[]
   salesInvoices             SalesInvoice[]
   payments                  Payment[]
+  backupRecords             BackupRecord[]
+  backupVerifications       BackupVerification[]
   paymentAllocations        PaymentAllocation[]
   taxConfigurationReviews   TaxConfigurationReview[]
   users                     User[]
@@ -200,6 +202,8 @@ model User {
   invoicesCreated   SalesInvoice[]           @relation("InvoiceCreator")
   invoicesConfirmed SalesInvoice[]           @relation("InvoicePosConfirmer")
   paymentsCreated   Payment[]                @relation("PaymentCreator")
+  backupsCreated    BackupRecord[]           @relation("BackupCreator")
+  backupsVerified   BackupVerification[]     @relation("BackupVerifier")
 
   @@unique([organizationId, username])
   @@index([organizationId])
@@ -933,4 +937,63 @@ model PaymentAllocation {
   @@unique([paymentId, invoiceId])
   @@index([organizationId, invoiceId])
   @@map("payment_allocations")
+}
+
+/// One created backup file (Task 1.17). Append-only, except that file_deleted_at can be set once (retention). The passphrase is
+/// never stored. `file_name` is the display name only; the destination folder is registered by the desktop shell, never sent by a client.
+model BackupRecord {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Strictly increasing creation order (independent of any clock).
+  seq              BigInt    @unique @default(autoincrement())
+  organizationId   String    @map("organization_id") @db.Uuid
+  /// MANUAL | PRE_RESTORE
+  kind             String
+  fileName         String    @map("file_name")
+  destinationLabel String?   @map("destination_label")
+  sizeBytes        BigInt    @map("size_bytes")
+  appVersion       String    @map("app_version")
+  schemaVersion    String    @map("schema_version")
+  backupFormat     Int       @map("backup_format")
+  /// Identity of the database the backup came from (see the recovery policy in ADR-0027).
+  databaseId       String    @map("database_id") @db.Uuid
+  /// SHA-256 of the manifest content: the fingerprint of the backup.
+  manifestSha256   String    @map("manifest_sha256")
+  createdBy        String?   @map("created_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  correlationId    String?   @map("correlation_id")
+  fileDeletedAt    DateTime? @map("file_deleted_at") @db.Timestamptz(6)
+
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  creator       User?                @relation("BackupCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  verifications BackupVerification[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("backup_records")
+}
+
+/// The outcome of one verified-restore run of a backup: decrypted, checked and restored into an isolated database, then reconciled.
+/// Append-only. The production gate reads the latest one (ADR-0027).
+model BackupVerification {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Strictly increasing: the order of verifications (the latest one decides the production gate), independent of any clock.
+  seq            BigInt   @unique @default(autoincrement())
+  organizationId String   @map("organization_id") @db.Uuid
+  backupId       String   @map("backup_id") @db.Uuid
+  /// PASS | FAIL
+  result         String
+  engineVersion  String   @map("engine_version")
+  schemaVersion  String   @map("schema_version")
+  databaseId     String   @map("database_id") @db.Uuid
+  verifiedAt     DateTime @default(now()) @map("verified_at") @db.Timestamptz(6)
+  /// Named checks with pass/fail and counts only: never row data, passphrases or paths.
+  details        Json
+  verifiedBy     String?  @map("verified_by") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  backup       BackupRecord @relation(fields: [backupId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  verifier     User?        @relation("BackupVerifier", fields: [verifiedBy], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, verifiedAt(sort: Desc)])
+  @@map("backup_verifications")
 }

@@ -17,6 +17,7 @@ export default defineConfig({
         'apps/desktop/src/preload.ts',
         // Electron windows and dialogs: verified by the Electron smoke check that renders a real PDF.
         'apps/desktop/src/electron-document.ts',
+        'apps/desktop/src/electron-backup.ts',
       ],
       // Phase 0 has little logic; thresholds are set on what exists and will be raised per phase.
       // They must never be lowered to make a failing run pass (spec section 41).

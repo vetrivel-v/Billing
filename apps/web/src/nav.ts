@@ -67,7 +67,7 @@ export const MODULES: readonly NavModule[] = [
     label: 'Settings',
     path: '/settings',
     permission: 'org.settings.read',
-    available: false,
+    available: true,
   },
 ];
 

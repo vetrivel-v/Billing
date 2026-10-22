@@ -90,3 +90,14 @@ reviewed in the diff.
 - Idempotency by operation id; the same id with different content is refused.
 - No card numbers, PINs or credentials are collected: a reference that looks like a card number is refused. Logs and the audit row carry no reference, notes or customer content.
 - DEMO payments are separate records that can only touch demo invoices and never enter production receivables.
+
+## Task 1.17 controls (backup and verified restore; ADR-0027)
+
+- Archives are encrypted and authenticated (AES-256-GCM in chunks, scrypt key from the user's passphrase, unique salt and nonce per file, header and final-chunk flag authenticated). A wrong passphrase, any changed byte, a removed, reordered or appended chunk and a truncated file are refused before anything is read as data. A reader refuses key-derivation parameters above its limits, so a hostile file cannot demand unbounded memory or time.
+- The passphrase is typed by the user, sent once in a request body over the loopback connection and dropped. It is never stored, logged, audited, put in a URL, a manifest, the command line or an environment variable. It cannot be recovered (R-098).
+- A restored archive is untrusted input: only `manifest.json` and `data/<table>.ndjson` entry names are accepted, extracted to generated names (no path from the archive is ever used), with entry and size caps; data must match the manifest checksums before it is loaded; a manifest of another format, version, schema or organization is refused.
+- The renderer has no file-system access. The backup folder and the restore file are chosen through argument-free IPC; the main process checks the sender, opens the native dialog and registers the path with the service using a second secret (`CONTROL_SECRET`) that never reaches the renderer; the service accepts only an existing writable folder or a recognisable `.cbbackup` file and returns only a display name and an opaque id. Control routes answer 403 without the secret (timing-safe comparison).
+- `backup.history.read` reads; `backup.create` and `backup.restore` are Administrator only; the organization comes from the session; another organization's backups are not found.
+- One operation at a time (advisory lock); a restore pauses the API (503) except health and backup status, takes a verified safety backup first, swaps databases by rename and keeps the previous one; any failure leaves the live data untouched.
+- The production gate fact comes from the persisted verification record (PASS, current engine, schema and database, at most 30 days), never from a boolean; the `AppDeps` seam is test-only. Verification never switches the billing mode.
+- Audit rows carry facts only (user, time, file name, outcome, failed check names); logs carry no passphrase, key, session or business data. Retention removes only recognised backup files the service itself recorded and never the newest verified backup.

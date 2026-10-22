@@ -22,6 +22,8 @@ function installBridge(): DesktopBridge {
     getAppInfo: async () => ({ name: 'x', version: '0', platform: 'win32' }),
     saveInvoicePdf: async () => ({ status: 'cancelled' }),
     printInvoice: async () => ({ status: 'cancelled' }),
+    chooseBackupDestination: async () => ({ status: 'cancelled' as const }),
+    chooseRestoreFile: async () => ({ status: 'cancelled' as const }),
     getApiAccess: vi.fn(async () => ({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET })),
   };
   window.commercebill = bridge;
@@ -99,6 +101,8 @@ describe('api client inside the Electron shell (P1-SEC-01)', () => {
       saveInvoicePdf: async () => ({ status: 'cancelled' }),
       printInvoice: async () => ({ status: 'cancelled' }),
       getAppInfo: async () => ({ name: '', version: '', platform: '' }),
+      chooseBackupDestination: async () => ({ status: 'cancelled' }),
+      chooseRestoreFile: async () => ({ status: 'cancelled' }),
       getApiAccess,
     };
     stubFetch();

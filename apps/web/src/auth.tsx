@@ -13,7 +13,7 @@ import * as api from './api.js';
 import { ApiError } from './api.js';
 
 /** Why the user is looking at the sign-in page without having just opened the app. */
-export type SignedOutNotice = 'signed-out' | 'expired' | 'ended' | 'setup-complete';
+export type SignedOutNotice = 'signed-out' | 'expired' | 'ended' | 'setup-complete' | 'restored';
 
 export type AuthState =
   | { phase: 'booting' }
@@ -28,6 +28,8 @@ export interface AuthApi {
   retryBoot(): Promise<void>;
   /** First-run setup finished: show sign-in (NO session is created) with the new administrator's username. */
   setupCompleted(username: string): void;
+  /** A backup was restored: every session is gone, so go to the sign-in page with an explanation. */
+  restoreCompleted(): void;
   /** Throws ApiError / ApiUnreachableError on failure; the caller decides the wording. */
   signIn(username: string, password: string): Promise<void>;
   signOut(): Promise<void>;
@@ -133,6 +135,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ phase: 'signed-out', notice: 'setup-complete', username });
   }, []);
 
+  const restoreCompleted = useCallback(() => {
+    tokenRef.current = null;
+    setState({ phase: 'signed-out', notice: 'restored' });
+  }, []);
+
   const signOut = useCallback(async () => {
     const token = tokenRef.current;
     tokenRef.current = null;
@@ -182,13 +189,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       retryBoot: boot,
       setupCompleted,
+      restoreCompleted,
       signIn,
       signOut,
       changePassword,
       authed: run,
       can: (permission) => permissions?.includes(permission) ?? false,
     }),
-    [state, boot, setupCompleted, signIn, signOut, changePassword, run, permissions],
+    [
+      state,
+      boot,
+      setupCompleted,
+      restoreCompleted,
+      signIn,
+      signOut,
+      changePassword,
+      run,
+      permissions,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -222,6 +222,14 @@ cleared or changed). Existing violating rows make the migration abort atomically
 - Triggers: before-insert checks (customer, financial year and user belong to the organization; an allocation can only be added in the transaction that created its payment, for an invoice of the same customer and the same kind - demo with demo, production with production); deferred constraint triggers at COMMIT: the payment number was issued by the numbering ledger and the allocations sum to the payment amount; the allocations of an invoice never exceed its grand total (the invoice row is locked first, so concurrent writers are serialized).
 - View `invoice_balances` (`security_invoker`): per invoice, grand total, allocated and balance due. There is NO balance column on any table.
 
+### 3.12 Changes in migration `20261028000000_task_1_17_backup_recovery` (Task 1.17)
+
+- New table `backup_records` (one row per backup file made): organization, `kind` (MANUAL | PRE_RESTORE), `file_name` (a plain `*.cbbackup` name, never a path; CHECK on the form), `destination_label` (display name of the folder), `size_bytes` > 0, `app_version`, `schema_version`, `backup_format`, `database_id` (identity of the database the backup came from), `manifest_sha256` (fingerprint of the manifest), `created_by` (optional: empty only for history carried into a restored database that does not contain the person), `created_at`, `correlation_id`, `file_deleted_at`, and `seq` (BIGSERIAL, unique: the ordering key for "latest", because timestamps can tie). Unique `(id, organization_id)`.
+- New table `backup_verifications` (one row per verification run): organization, composite foreign key to the backup, `result` (PASS | FAIL), `engine_version`, `schema_version`, `database_id`, `verified_at`, `details` (JSON of check names and pass/fail only, never data), `verified_by` (optional on the same terms), and `seq`.
+- Both tables are append-only: `backup_verifications` refuses UPDATE, DELETE and TRUNCATE; `backup_records` refuses DELETE and TRUNCATE and allows exactly one update, setting `file_deleted_at` from NULL when retention removes the file. Before-insert triggers check that the user belongs to the organization and that a verification carries the same `database_id` as its backup.
+- Nothing in these tables can hold a passphrase, key, session, path or business data. The `sessions` table is excluded from backups (the 32 application tables are backed up; sessions are not).
+- Existing tables are untouched. Settings keys used by the service (in `organization_settings`): `recovery.database_identity`, `backup.destination`, `backup.retention_keep`.
+
 ## 4. Relationship explanation
 
 - Everything business-related hangs off `organizations`, so multiple organizations can share one database.
