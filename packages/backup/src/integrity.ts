@@ -48,7 +48,7 @@ export function expectedTriggers(migrationSql: string[]): { name: string; table:
 const count = async (c: pg.Client, sql: string, params: unknown[] = []): Promise<number> =>
   Number((await c.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
 
-async function foreignKeyViolations(c: pg.Client): Promise<number> {
+export async function foreignKeyViolations(c: pg.Client): Promise<number> {
   const fks = await c.query<{
     child: string;
     parent: string;

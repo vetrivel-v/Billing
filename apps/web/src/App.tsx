@@ -4,6 +4,7 @@ import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router';
 import { useAuth } from './auth.js';
 import { ChangePasswordPage, ForcedChangePasswordPage } from './ChangePasswordPage.js';
 import { BackupPage } from './backup/BackupPage.js';
+import { AboutPage } from './backup/AboutPage.js';
 import { SettingsPage } from './backup/SettingsPage.js';
 import { CustomerFormPage } from './customers/CustomerFormPage.js';
 import { CustomersPage } from './customers/CustomersPage.js';
@@ -164,6 +165,14 @@ function Shell() {
           element={
             <Guarded module="settings">
               <SettingsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/settings/about"
+          element={
+            <Guarded module="settings">
+              <AboutPage />
             </Guarded>
           }
         />

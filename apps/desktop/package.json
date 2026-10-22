@@ -1,6 +1,6 @@
 {
   "name": "@commercebill/desktop",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "CommerceBill Desktop Electron shell",
   "main": "dist/main.cjs",
@@ -13,6 +13,9 @@
     "@commercebill/document-engine": "^0.0.1",
     "@commercebill/shared-types": "^0.0.1",
     "@commercebill/validation": "^0.0.1",
-    "electron": "^44.8.0"
+    "electron": "^44.8.0",
+    "@commercebill/backup": "^0.0.1",
+    "pg": "^8.23.1",
+    "@types/pg": "^8.23.1"
   }
 }

@@ -86,10 +86,14 @@ describe('production-like Electron: the real Backup & Recovery screens, real IPC
     expect(out.bridgeKeys).toEqual([
       'chooseBackupDestination',
       'chooseRestoreFile',
+      'exportDiagnostics',
       'getApiAccess',
       'getAppInfo',
+      'getDiagnostics',
+      'openLogFolder',
       'printInvoice',
       'saveInvoicePdf',
+      'showSafetyPassphrase',
     ]);
     expect(out.noFolderYet).toBe(true);
     expect(out.folderLabelShown).toBe(true);

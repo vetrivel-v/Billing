@@ -22,6 +22,14 @@ export function SettingsPage() {
             </Link>
           </Card>
         )}
+        <Card title="About & Diagnostics">
+          <p className="mb-2 text-sm text-slate-600">
+            Versions, the state of the local database and service, and diagnostics for support.
+          </p>
+          <Link to="/settings/about" className={link}>
+            Open About & Diagnostics
+          </Link>
+        </Card>
         {can('tax.config.read') && (
           <Card title="Tax configuration">
             <p className="mb-2 text-sm text-slate-600">

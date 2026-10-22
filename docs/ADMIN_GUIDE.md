@@ -35,3 +35,12 @@ Every backup, verification, retention change and restore writes an audit row wit
 ## When something looks wrong
 
 See [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md).
+
+## Running the installed application (Windows)
+
+- **Where things are.** Program: `%LOCALAPPDATA%\Programs\CommerceBill`. Business data, settings and logs: `%LOCALAPPDATA%\CommerceBill`. Never delete, move or edit the data folder by hand; uninstalling the program leaves it in place on purpose.
+- **Start and stop.** Open from the shortcut; close with the window's X and wait for it to close. The database starts and stops with the program. Do not end `postgres.exe` in Task Manager while the program is open.
+- **About & Diagnostics** (Settings): versions, whether the database and service are running, the data folder, and **Save diagnostics** (no passwords, no business data). Administrators can also show the passphrase of the safety backups.
+- **Updating.** Run the newer installer over the old one. Before changing the database the program makes and verifies a safety backup in `backups\pre-upgrade`; if that fails it stops and changes nothing. Keep the passphrase of safety backups somewhere safe.
+- **Moving to another computer.** Do not copy the data folder (its password is bound to the Windows user). Make a verified backup, install on the new computer, and restore.
+- **If it will not start**, read TROUBLESHOOTING.md; never delete the data folder.

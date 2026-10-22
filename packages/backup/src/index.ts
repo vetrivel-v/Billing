@@ -41,6 +41,10 @@ export { PROJECTION_TABLE, RestoreError, loadSnapshot } from './restore.js';
 export { allPassed, expectedTriggers, runIntegrityChecks, type CheckResult } from './integrity.js';
 export {
   applyMigrations,
+  applyPendingMigrations,
+  migrationStatus,
+  type MigrationState,
+  type MigrationStatus,
   createDatabase,
   databaseNameOf,
   dropDatabase,
@@ -48,3 +52,11 @@ export {
   readMigrations,
   withDatabaseName,
 } from './migrations.js';
+export {
+  createPreUpgradeBackup,
+  databaseHasBusinessData,
+  generateSafetyPassphrase,
+  verifyPreUpgradeBackup,
+  type PreUpgradeBackup,
+  type PreUpgradeCheck,
+} from './preupgrade.js';

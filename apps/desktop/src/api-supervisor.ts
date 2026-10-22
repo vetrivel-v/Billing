@@ -39,6 +39,10 @@ export interface ApiLaunchConfig {
   nodeEnv?: string;
   /** The shell's own secret for choosing the backup folder and restore file. Never given to the renderer. */
   controlSecret?: string;
+  /** Where the shipped migrations are (the installed layout differs from the repository layout). */
+  migrationsDir?: string;
+  /** Receives the child's output (already without the launch secret removed: the caller redacts before writing it anywhere). */
+  onOutput?: (chunk: string) => void;
   /** Executable used to run the entry. In Electron this is process.execPath with ELECTRON_RUN_AS_NODE. */
   execPath?: string;
 }
@@ -69,7 +73,9 @@ export function buildApiSpawn(
     WEB_ORIGIN: config.webOrigin,
     DATABASE_URL: config.databaseUrl,
     LAUNCH_SECRET: config.secret,
+    COMMERCEBILL_PARENT_PID: String(process.pid),
     ...(config.controlSecret ? { CONTROL_SECRET: config.controlSecret } : {}),
+    ...(config.migrationsDir ? { MIGRATIONS_DIR: config.migrationsDir } : {}),
   });
   return { command: config.execPath ?? process.execPath, args: [config.entry], env };
 }
@@ -117,7 +123,9 @@ export async function startApi(
   const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   let output = '';
   const collect = (chunk: Buffer) => {
-    output = (output + chunk.toString('utf8')).slice(-OUTPUT_CAP);
+    const text = chunk.toString('utf8');
+    output = (output + text).slice(-OUTPUT_CAP);
+    config.onOutput?.(text);
   };
   child.stdout.on('data', collect);
   child.stderr.on('data', collect);

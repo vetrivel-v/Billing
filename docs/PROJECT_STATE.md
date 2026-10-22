@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-10-22 (after Phase 1 Task 1.18: FIRST USABLE BILLING). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-23 (after the Windows packaging milestone, following Phase 1 Task 1.18). This file and the repository are the implementation record (spec section 44).
 
 | Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -197,6 +197,16 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
+
+## Windows desktop packaging and installation (after Task 1.18; see docs/WINDOWS_PACKAGING_REPORT.md, ADR-0029)
+
+**CommerceBill can now be built into a Windows installer (`npm run package:win`) that installs without developer tools. The installer is UNSIGNED. Installation on the target laptop, a real reboot, native dialogs, a physical printer and an external drive are NOT TESTED (docs/WINDOWS_LAPTOP_ACCEPTANCE.md). R-040 stays open; production billing is not enabled.**
+
+- **Installer:** per-user NSIS, no elevation, Start-menu and desktop shortcuts, plain uninstall that keeps data. `release/installer-info.json` records version, size, SHA-256, command, signed flag and environment (binaries are not committed).
+- **Runtime:** private PostgreSQL 18 on 127.0.0.1 with generated credentials protected by Windows DPAPI; data in `%LOCALAPPDATA%\CommerceBill`; fresh/existing/broken decision at start-up that never replaces a missing database; clean shutdown; orphan recovery; single instance; log redaction and rotation; About & Diagnostics with export.
+- **Upgrade safety:** a verified pre-upgrade backup (Task 1.17 engine) before any migration; migration or backup failure blocks start-up.
+- **Verification:** `tests/integration/runtime.int.test.ts` (managed runtime with the real PostgreSQL binaries), `tests/release/packaged-e2e.rel.test.ts` (FIRST USABLE BILLING journey in the packaged application), `tests/release/installer.rel.test.ts` (the real installer); `npm run verify:release` aggregates everything release-critical. No automated test group is outside the gate (an earlier "18 tests outside" note was an arithmetic slip).
+- **New risks:** R-108 to R-117; R-090 and R-105 partly addressed; R-093 stays open (native dialogs not exercised); R-104 monitored.
 
 ## Task 1.18 results: FIRST USABLE BILLING (see docs/FIRST_USABLE_BILLING_REPORT.md, docs/PHASE_1_TASK_1_18_COMPLETION_REPORT.md, ADR-0028)
 

@@ -101,3 +101,13 @@ reviewed in the diff.
 - One operation at a time (advisory lock); a restore pauses the API (503) except health and backup status, takes a verified safety backup first, swaps databases by rename and keeps the previous one; any failure leaves the live data untouched.
 - The production gate fact comes from the persisted verification record (PASS, current engine, schema and database, at most 30 days), never from a boolean; the `AppDeps` seam is test-only. Verification never switches the billing mode.
 - Audit rows carry facts only (user, time, file name, outcome, failed check names); logs carry no passphrase, key, session or business data. Retention removes only recognised backup files the service itself recorded and never the newest verified backup.
+
+## Windows packaging controls (installed runtime; ADR-0029)
+
+- The private PostgreSQL listens on 127.0.0.1 only, on a random free port, with `scram-sha-256` and a generated password; the service also listens on 127.0.0.1 only. The installed-application test connects to both from the computer's own LAN addresses and must be refused. No firewall rule is created.
+- The database password and the safety-backup passphrase are generated with a CSPRNG and stored only in `config\secrets.bin`, encrypted with Windows DPAPI (Electron `safeStorage`) for the current user. They are never sent to the renderer, written to a log (redaction is tested), placed in a bundle or in source.
+- Install is per user and needs no elevation; the uninstaller keeps business data. Program files and data are separate folders.
+- A database that is missing or unreadable is never replaced silently by a new empty one; a newer database is refused by an older program; a failed pre-upgrade backup or migration blocks normal start-up.
+- The `RunAsNode` fuse stays enabled because the service runs under the Electron binary as Node; it is limited by the launch secret, loopback-only binding and the control-secret channel. The packaged end-to-end driver needs a marker file the release installer does not contain (R-111).
+- The installer is unsigned unless a certificate is supplied at build time (R-108). SHA-256 is recorded in `release/installer-info.json`.
+- `npm audit --omit=dev --audit-level=high` is part of `verify:release`.

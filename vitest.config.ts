@@ -18,6 +18,7 @@ export default defineConfig({
         // Electron windows and dialogs: verified by the Electron smoke check that renders a real PDF.
         'apps/desktop/src/electron-document.ts',
         'apps/desktop/src/electron-backup.ts',
+        'apps/desktop/src/electron-runtime.ts',
       ],
       // Phase 0 has little logic; thresholds are set on what exists and will be raised per phase.
       // They must never be lowered to make a failing run pass (spec section 41).
@@ -49,6 +50,17 @@ export default defineConfig({
           globalSetup: ['tests/integration/global-setup.ts'],
           testTimeout: 60_000,
           hookTimeout: 120_000,
+          fileParallelism: false,
+        },
+      },
+      {
+        // Windows packaging: builds and installs the real installer. Run by `npm run verify:release`, not by the everyday gate.
+        extends: true,
+        test: {
+          name: 'release',
+          include: ['tests/release/**/*.rel.test.ts'],
+          testTimeout: 900_000,
+          hookTimeout: 900_000,
           fileParallelism: false,
         },
       },

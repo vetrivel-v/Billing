@@ -115,9 +115,13 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
     'document:print-invoice',
     'backup:choose-destination',
     'backup:choose-restore-file',
+    'app:get-diagnostics',
+    'app:export-diagnostics',
+    'app:open-log-folder',
+    'app:show-safety-passphrase',
   ]);
 
-  it('the preload exposes exactly six bridge methods, only through the six allowed channels', () => {
+  it('the preload exposes exactly ten bridge methods, only through the ten allowed channels', () => {
     const p = src('preload.ts');
     const channels = [...p.matchAll(/ipcRenderer\.invoke\('([^']+)'/g)].map((m) => m[1]!);
     expect(channels.sort()).toEqual([...ALLOWED].sort());
@@ -142,6 +146,10 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
       'printInvoice',
       'chooseBackupDestination',
       'chooseRestoreFile',
+      'getDiagnostics',
+      'exportDiagnostics',
+      'openLogFolder',
+      'showSafetyPassphrase',
     ])
       expect(p).toContain(`${key}:`);
   });
@@ -156,6 +164,10 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
       'BACKUP_CHANNELS.chooseRestoreFile',
       'DOCUMENT_CHANNELS.savePdf',
       'DOCUMENT_CHANNELS.print',
+      "'app:get-diagnostics'",
+      "'app:export-diagnostics'",
+      "'app:open-log-folder'",
+      "'app:show-safety-passphrase'",
     ]);
     const handler = m.slice(
       m.indexOf('function documentHandler'),
@@ -192,6 +204,38 @@ describe('the renderer has no unrestricted capability (source guard-rails)', () 
     const e = src('electron-backup.ts');
     expect(e).toContain("'openDirectory'");
     expect(e).not.toMatch(/writeFile|unlink|rm\(|readFile|child_process|shell\./);
+  });
+
+  it('the diagnostics and support handlers take no renderer argument, check the sender first, and never return a secret', () => {
+    const m = src('main.ts');
+    for (const name of [
+      'app:get-diagnostics',
+      'app:export-diagnostics',
+      'app:open-log-folder',
+      'app:show-safety-passphrase',
+    ]) {
+      const start = m.indexOf(`ipcMain.handle('${name}'`);
+      expect(start, name).toBeGreaterThan(-1);
+      const body = m.slice(start, m.indexOf('});', start));
+      expect(body.indexOf('assertTrusted(event)'), name).toBeGreaterThan(-1);
+      expect(body, name).not.toMatch(/payload|\.\.\.args/);
+    }
+    // the safety passphrase is shown in a native message box and only its status goes back to the page
+    const pass = m.slice(
+      m.indexOf("ipcMain.handle('app:show-safety-passphrase'"),
+      m.indexOf("ipcMain.handle('app:show-safety-passphrase'") + 700,
+    );
+    expect(pass).toContain('showSafetyPassphraseDialog(p)');
+    expect(pass).not.toMatch(/return \{[^}]*(?<![A-Za-z])p(?![A-Za-z])/);
+    // the database credentials are never part of the diagnostics, the API access answer or the page
+    const r = src('runtime/diagnostics.ts');
+    expect(r).not.toMatch(/dbPassword|safetyPassphrase|loadSecrets/);
+    expect(
+      m.slice(
+        m.indexOf("ipcMain.handle('app:get-api-access'"),
+        m.indexOf("ipcMain.handle('app:get-api-access'") + 400,
+      ),
+    ).not.toMatch(/databaseUrl|dbPassword/);
   });
 
   it('the hidden render window is locked down: no JavaScript, sandboxed, every non-data request cancelled', () => {

@@ -29,6 +29,12 @@ function installBridge() {
     printInvoice: async () => ({ status: 'cancelled' }),
     chooseBackupDestination: async () => ({ status: 'cancelled' as const }),
     chooseRestoreFile: async () => ({ status: 'cancelled' as const }),
+    getDiagnostics: async () => {
+      throw new Error('not used');
+    },
+    exportDiagnostics: async () => ({ status: 'cancelled' as const }),
+    openLogFolder: async () => ({ status: 'opened' as const }),
+    showSafetyPassphrase: async () => ({ status: 'unavailable' as const }),
     getApiAccess: async () => ({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET }),
   };
   window.commercebill = bridge;

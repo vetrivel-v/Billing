@@ -41,6 +41,17 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  // When the desktop shell that started this service disappears without stopping it (a crash, a forced end), the service ends too instead
+  // of lingering with its database connections. Only a process id is passed: no secret.
+  const parent = Number(process.env.COMMERCEBILL_PARENT_PID);
+  if (Number.isInteger(parent) && parent > 0)
+    setInterval(() => {
+      try {
+        process.kill(parent, 0);
+      } catch {
+        void shutdown();
+      }
+    }, 4000).unref();
 
   // Loopback only: env validation rejects any non-loopback API_HOST (spec section 38).
   await app.listen({ host: env.API_HOST, port: env.API_PORT });

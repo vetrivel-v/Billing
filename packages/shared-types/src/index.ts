@@ -89,6 +89,34 @@ export interface DesktopBridge {
   chooseBackupDestination(): Promise<BackupChoiceResult>;
   /** Opens the operating system's file chooser for a backup to restore. The renderer receives an opaque id and the file name, never a path. */
   chooseRestoreFile(): Promise<BackupChoiceResult>;
+  /** Safe facts for a support conversation (versions, database and service state, log folder). Never credentials or business data. */
+  getDiagnostics(): Promise<Diagnostics>;
+  /** Saves the diagnostics as a text file through a save dialog. */
+  exportDiagnostics(): Promise<{ status: 'saved' | 'cancelled' | 'failed' }>;
+  /** Opens the folder holding the diagnostic logs in Windows Explorer. */
+  openLogFolder(): Promise<{ status: 'opened' | 'failed' }>;
+  /** Shows, in a Windows message box (never in the page), the passphrase of the safety backups made before an update. */
+  showSafetyPassphrase(): Promise<{ status: 'shown' | 'unavailable' }>;
+}
+
+/**
+ * What a support person needs when "CommerceBill isn't opening", and nothing more: it never contains a password, passphrase, token,
+ * launch secret, customer or invoice data.
+ */
+export interface Diagnostics {
+  generatedAt: string;
+  application: { name: string; version: string };
+  windows: { version: string; release: string; arch: string };
+  database: { running: boolean; port: number | null; install: 'fresh' | 'existing' | 'unknown' };
+  schema: { current: string | null; expected: string | null; state: string };
+  api: { health: 'ok' | 'not running' | 'unknown' };
+  backup: { lastVerificationResult: string | null; lastVerifiedAt: string | null };
+  lastUpgrade: { from: string | null; to: string; at: string; safetyBackup: string | null } | null;
+  storage: { dataFolder: string; logFolder: string; freeMegabytes: number | null };
+  logs: { name: string; kilobytes: number }[];
+  startupProblem: { code: string; message: string } | null;
+  /** True when CommerceBill itself manages the local database (the installed application). */
+  managedDatabase: boolean;
 }
 
 /** The outcome of a native backup folder/file chooser. Never carries a path. */
@@ -100,8 +128,12 @@ export interface BackupChoiceResult {
   sourceId?: string;
 }
 
-/** Application version reported by health checks until release tooling injects it (Phase 6). */
-export const APP_VERSION = '0.0.1';
+/**
+ * The application version (SemVer). It is the single release number: the installer, the About screen and the health check all show it
+ * (a test keeps it equal to apps/desktop/package.json). It is independent of the database structure version (the newest migration name)
+ * and never feeds into any document number.
+ */
+export const APP_VERSION = '0.1.0';
 
 /** POST /auth/login success body. The token goes in the Authorization header of later requests. */
 export interface LoginResponse {
@@ -776,7 +808,7 @@ export interface RestoreInspectResponse {
   schemaVersion: string;
   schemaCompatible: boolean;
   sameDatabase: boolean;
-  kind: 'MANUAL' | 'PRE_RESTORE';
+  kind: 'MANUAL' | 'PRE_RESTORE' | 'PRE_UPGRADE';
   tables: number;
   rows: number;
   verificationStatus: 'PASS' | 'FAIL' | 'NOT_VERIFIED';

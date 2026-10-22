@@ -9,7 +9,8 @@ export interface BackupManifest {
   format: typeof BACKUP_FORMAT;
   formatVersion: number;
   backupId: string;
-  kind: 'MANUAL' | 'PRE_RESTORE';
+  /** PRE_UPGRADE: the safety backup the installed application makes before it changes the database structure (never listed as a recorded backup). */
+  kind: 'MANUAL' | 'PRE_RESTORE' | 'PRE_UPGRADE';
   createdAt: string;
   appVersion: string;
   /** The last applied migration of the database the backup came from. */
@@ -66,7 +67,7 @@ export function parseManifest(bytes: Buffer): BackupManifest {
       'This backup was made by a different backup format and cannot be restored by this version.',
     );
   if (typeof o.backupId !== 'string' || !UUID.test(o.backupId)) bad('backup id');
-  if (o.kind !== 'MANUAL' && o.kind !== 'PRE_RESTORE') bad('kind');
+  if (o.kind !== 'MANUAL' && o.kind !== 'PRE_RESTORE' && o.kind !== 'PRE_UPGRADE') bad('kind');
   if (typeof o.createdAt !== 'string' || Number.isNaN(Date.parse(o.createdAt))) bad('created time');
   if (typeof o.appVersion !== 'string' || o.appVersion.length > 40) bad('application version');
   if (typeof o.schemaVersion !== 'string' || !/^\d{14}_[a-z0-9_]+$/.test(o.schemaVersion))

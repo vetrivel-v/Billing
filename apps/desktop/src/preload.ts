@@ -12,6 +12,10 @@ const bridge: DesktopBridge = {
   printInvoice: (invoice) => ipcRenderer.invoke('document:print-invoice', invoice),
   chooseBackupDestination: () => ipcRenderer.invoke('backup:choose-destination'),
   chooseRestoreFile: () => ipcRenderer.invoke('backup:choose-restore-file'),
+  getDiagnostics: () => ipcRenderer.invoke('app:get-diagnostics'),
+  exportDiagnostics: () => ipcRenderer.invoke('app:export-diagnostics'),
+  openLogFolder: () => ipcRenderer.invoke('app:open-log-folder'),
+  showSafetyPassphrase: () => ipcRenderer.invoke('app:show-safety-passphrase'),
 };
 
 contextBridge.exposeInMainWorld('commercebill', bridge);

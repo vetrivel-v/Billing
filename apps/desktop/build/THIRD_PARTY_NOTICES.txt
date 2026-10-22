@@ -1,0 +1,26 @@
+CommerceBill Desktop - third-party components shipped in the installer
+=======================================================================
+
+This list names what is bundled. The full licence texts of the Electron and Chromium components are
+installed next to the program (LICENSE, LICENSES.chromium.html). Before the application is distributed
+to anyone outside the business that built it, the full licence text of every component below must be
+reviewed and added to the installer (release checklist item).
+
+Component                       Licence                  Notes
+------------------------------  -----------------------  --------------------------------------------------
+Electron (Chromium, Node.js)    MIT, BSD, others         the desktop shell; see LICENSES.chromium.html
+PostgreSQL 18 programs          PostgreSQL Licence       private database server run by CommerceBill
+  (initdb, pg_ctl, postgres)                             from the "embedded-postgres" binaries distribution
+ICU (icu*.dll)                  Unicode Licence          text ordering and case rules inside PostgreSQL
+OpenSSL (libcrypto, libssl)     Apache-2.0               inside PostgreSQL
+libxml2, libxslt, zlib, zstd,   MIT / zlib / BSD          inside PostgreSQL
+  lz4, libiconv, libintl, libpq
+Microsoft Visual C++ runtime    Microsoft redistributable vcruntime140.dll, vcruntime140_1.dll, msvcp140.dll,
+                                (app-local deployment)   shipped beside the PostgreSQL programs
+@node-rs/argon2                 MIT                      password hashing (native module)
+Fastify, pg, Prisma client,     MIT / Apache-2.0         bundled into the local service
+  zod and their dependencies
+React, React Router, TanStack   MIT                      the screens
+  Query, Tailwind CSS (compiled)
+
+CommerceBill itself is not open source software; its licence is set by its owner.

@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/out/**',
       '**/coverage/**',
+      'release/**',
       '.data/**',
       'packages/database/src/generated/**',
     ],

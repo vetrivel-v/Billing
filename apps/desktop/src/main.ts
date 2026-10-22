@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -7,12 +7,18 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   net,
   protocol,
   shell,
   type IpcMainInvokeEvent,
 } from 'electron';
-import { APP_VERSION, type ApiAccess, type DocumentOutputResult } from '@commercebill/shared-types';
+import {
+  APP_VERSION,
+  type ApiAccess,
+  type Diagnostics,
+  type DocumentOutputResult,
+} from '@commercebill/shared-types';
 import { parseEnv } from '@commercebill/validation';
 import { generateLaunchSecret, getFreePort, startApi, type RunningApi } from './api-supervisor.js';
 import { resolveAppRequest } from './app-protocol.js';
@@ -25,6 +31,29 @@ import {
 import { BACKUP_CHANNELS, registerChosenPath } from './backup-ipc.js';
 import { chooseBackupFile, chooseFolder, setBackupDialogHooks } from './electron-backup.js';
 import { printInvoice, renderPdf, saveInvoicePdf, setOutputHooks } from './electron-document.js';
+import {
+  electronCipher,
+  localAppDataDir,
+  saveDiagnosticsDialog,
+  showSafetyPassphraseDialog,
+  showSplash,
+  showStartupFailure,
+} from './electron-runtime.js';
+import {
+  collectDiagnostics,
+  formatDiagnostics,
+  writeRuntimeStatus,
+} from './runtime/diagnostics.js';
+import { AppLog } from './runtime/logger.js';
+import {
+  resolveDevResources,
+  resolvePackagedResources,
+  resolveRuntimePaths,
+  type ResourceDirs,
+  type RuntimePaths,
+} from './runtime/paths.js';
+import { loadSecrets } from './runtime/secrets.js';
+import { StartupError, startRuntime, type RuntimeHandle } from './runtime/startup.js';
 import {
   APP_ORIGIN,
   APP_SCHEME,
@@ -42,12 +71,22 @@ const docSmoke = process.env.ELECTRON_DOC_SMOKE === '1' && !app.isPackaged;
 // Verification only: drive the real Backup & Recovery screens in the real renderer (see runBackupSmoke).
 const backupSmoke = process.env.ELECTRON_BACKUP_SMOKE === '1' && !app.isPackaged;
 // Verification only: the First Usable Billing end-to-end check (see runE2e).
-const e2e = process.env.ELECTRON_E2E === '1' && !app.isPackaged;
+// (an installed build honours it only when the packager added the e2e-enabled marker: the release installer never has it)
+const e2e =
+  process.env.ELECTRON_E2E === '1' &&
+  (!app.isPackaged || existsSync(join(process.resourcesPath, 'e2e-enabled')));
 // Verification only: render one invoice snapshot to PDF and exit (no window, no API). See runPdfSmoke.
 const pdfSmoke = !app.isPackaged && Boolean(process.env.ELECTRON_PDF_FIXTURE);
-// Dev layout: apps/desktop/dist -> apps/web/dist and apps/api/dist. Packaged layout is Phase 6 work.
-const webRoot = join(__dirname, '..', '..', 'web', 'dist');
-const apiEntry = join(__dirname, '..', '..', 'api', 'dist', 'main.js');
+// The installed application (or COMMERCEBILL_MANAGED_DB=1 in a build run from the project folder) owns a private local PostgreSQL: it
+// starts it, finds or creates the data, upgrades it safely and stops it (ADR-0029). Otherwise DATABASE_URL names a database (development
+// and the automated checks).
+const managed = app.isPackaged || process.env.COMMERCEBILL_MANAGED_DB === '1';
+// Installed layout: resources next to the executable. Development layout: apps/desktop/dist -> the repository root.
+const resources: ResourceDirs = app.isPackaged
+  ? resolvePackagedResources(process.resourcesPath)
+  : resolveDevResources(join(__dirname, '..', '..', '..'));
+const webRoot = resources.webRoot;
+const apiEntry = resources.apiEntry;
 
 // Must run before the app is ready. A standard, secure scheme gives the renderer a real origin so the
 // API's CORS allow-list can be enforced (a file:// page would send the opaque origin "null").
@@ -60,6 +99,11 @@ protocol.registerSchemesAsPrivileged([
 
 let api: RunningApi | undefined;
 let launchSecret: string | undefined;
+let mainWindow: BrowserWindow | undefined;
+let runtimePaths: RuntimePaths | undefined;
+let appLog: AppLog | undefined;
+let runtimeHandle: RuntimeHandle | undefined;
+let startupProblem: { code: string; message: string } | null = null;
 /** The shell's own secret for the backup choosers; the renderer never receives it. */
 let controlSecret: string | undefined;
 
@@ -69,7 +113,24 @@ function createWindow(): BrowserWindow {
     height: 800,
     show: false,
     title: 'CommerceBill Desktop',
-    webPreferences: { ...WEB_PREFERENCES, preload: join(__dirname, 'preload.cjs') },
+    // No developer tools in the installed application.
+    webPreferences: {
+      ...WEB_PREFERENCES,
+      devTools: !app.isPackaged,
+      preload: join(__dirname, 'preload.cjs'),
+    },
+  });
+  mainWindow = win;
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = undefined;
+  });
+  // Windows is logging off or shutting down: the database is stopped cleanly if there is time (otherwise crash recovery runs next start).
+  win.on('session-end', () => {
+    try {
+      runtimeHandle?.postgres.stopSync();
+    } catch {
+      // nothing more can be done
+    }
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -147,12 +208,12 @@ function runSmokeCheck(win: BrowserWindow): void {
         process.stdout.write(
           `SMOKE_RESULT ${JSON.stringify({ ...r, secretInApiOutput, secretFingerprint })}\n`,
         );
-        await api?.stop();
+        await shutdownAll();
         app.exit(r.nodeExposed || secretInApiOutput ? 2 : 0);
       })
       .catch(async (e: unknown) => {
         process.stderr.write(`SMOKE_FAILED ${String(e)}\n`);
-        await api?.stop();
+        await shutdownAll();
         endProcess(1);
       });
   });
@@ -229,12 +290,12 @@ function runDocumentSmoke(win: BrowserWindow): void {
             savedPages: first ? pdfPageCount(first) : 0,
           })}\n`,
         );
-        await api?.stop();
+        await shutdownAll();
         app.exit(0);
       })
       .catch(async (e: unknown) => {
         process.stderr.write(`DOC_SMOKE_FAILED ${String(e)}\n`);
-        await api?.stop();
+        await shutdownAll();
         endProcess(1);
       });
   });
@@ -324,12 +385,12 @@ function runBackupSmoke(win: BrowserWindow): void {
             controlSecretInApiOutput: Boolean(controlSecret && apiOutput.includes(controlSecret)),
           })}\n`,
         );
-        await api?.stop();
+        await shutdownAll();
         app.exit(0);
       })
       .catch(async (e: unknown) => {
         process.stderr.write(`BACKUP_SMOKE_FAILED ${String(e)}\n`);
-        await api?.stop();
+        await shutdownAll();
         endProcess(1);
       });
   });
@@ -371,12 +432,12 @@ function runE2e(win: BrowserWindow): void {
             launchSecretInApiOutput: Boolean(launchSecret && apiOutput.includes(launchSecret)),
           })}\n`,
         );
-        await api?.stop();
+        await shutdownAll();
         app.exit(0);
       })
       .catch(async (e: unknown) => {
         process.stderr.write(`E2E_FAILED ${String(e)}\n`);
-        await api?.stop();
+        await shutdownAll();
         endProcess(1);
       });
   });
@@ -482,7 +543,47 @@ async function runPdfSmoke(): Promise<void> {
   }
 }
 
-async function startLocalApi(): Promise<void> {
+/** Stops what this process started: the local service first, then (when CommerceBill owns it) the database. Safe to call twice. */
+async function shutdownAll(): Promise<void> {
+  const a = api;
+  api = undefined;
+  await a?.stop();
+  const r = runtimeHandle;
+  runtimeHandle = undefined;
+  if (r) {
+    try {
+      await r.stop();
+    } catch (e) {
+      appLog?.error(
+        `the database did not stop cleanly: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+  if (managed && runtimePaths)
+    writeRuntimeStatus(runtimePaths, {
+      state: 'stopped',
+      appVersion: APP_VERSION,
+      mainPid: process.pid,
+    });
+}
+
+/** Managed: start (or create, or upgrade) CommerceBill's own database. Otherwise the database named by DATABASE_URL. */
+async function prepareDatabase(): Promise<string | undefined> {
+  if (!managed) return process.env.DATABASE_URL;
+  runtimePaths ??= resolveRuntimePaths({ env: process.env, localAppData: localAppDataDir() });
+  appLog ??= new AppLog(runtimePaths.logsDir);
+  appLog.info(`starting CommerceBill ${APP_VERSION}`);
+  runtimeHandle = await startRuntime({
+    paths: runtimePaths,
+    resources,
+    cipher: electronCipher,
+    appVersion: APP_VERSION,
+    log: appLog,
+  });
+  return runtimeHandle.databaseUrl;
+}
+
+async function startLocalApi(databaseUrl: string | undefined): Promise<void> {
   const secret = generateLaunchSecret();
   controlSecret = generateLaunchSecret();
   const port = await getFreePort();
@@ -493,10 +594,14 @@ async function startLocalApi(): Promise<void> {
     API_HOST: '127.0.0.1',
     API_PORT: String(port),
     WEB_ORIGIN: rendererOrigin(devServerUrl),
-    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_URL: databaseUrl,
     LAUNCH_SECRET: secret,
   });
   launchSecret = secret;
+  const apiLog = managed && runtimePaths ? new AppLog(runtimePaths.logsDir, 'api') : undefined;
+  apiLog?.addSecret(secret);
+  apiLog?.addSecret(controlSecret);
+  if (runtimeHandle) apiLog?.addSecret(decodeURIComponent(new URL(env.DATABASE_URL).password));
   api = await startApi({
     entry: apiEntry,
     port: env.API_PORT,
@@ -504,9 +609,96 @@ async function startLocalApi(): Promise<void> {
     controlSecret,
     webOrigin: rendererOrigin(devServerUrl),
     databaseUrl: env.DATABASE_URL,
+    migrationsDir: resources.migrationsDir,
+    ...(apiLog ? { onOutput: (t: string) => apiLog.info(t.trimEnd()) } : {}),
     logLevel: process.env.LOG_LEVEL ?? 'info',
   });
+  if (managed && runtimePaths && runtimeHandle)
+    writeRuntimeStatus(runtimePaths, {
+      state: 'running',
+      appVersion: APP_VERSION,
+      mainPid: process.pid,
+      databasePort: runtimeHandle.port,
+      databasePid: (await runtimeHandle.postgres.status()).pid,
+      apiPort: env.API_PORT,
+      schemaVersion: runtimeHandle.migration.current,
+      install: runtimeHandle.install,
+      upgraded: Boolean(runtimeHandle.upgrade),
+      reusedDatabase: runtimeHandle.reusedRunningDatabase,
+      clusterId: readClusterId(),
+      startedAt: new Date().toISOString(),
+    });
 }
+
+/** The installation's own id (not a secret): lets a support person or a test tell one data folder from another. */
+function readClusterId(): string | null {
+  try {
+    return (
+      (JSON.parse(readFileSync(runtimePaths!.runtimeJson, 'utf8')) as { clusterId?: string })
+        .clusterId ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function currentDiagnostics(): Promise<Diagnostics> {
+  runtimePaths ??= resolveRuntimePaths({ env: process.env, localAppData: localAppDataDir() });
+  let apiHealthy: boolean | null = false;
+  if (api) {
+    try {
+      apiHealthy = (await net.fetch(`${api.baseUrl}/health`)).ok;
+    } catch {
+      apiHealthy = false;
+    }
+  }
+  return collectDiagnostics({
+    paths: runtimePaths,
+    resources,
+    appVersion: APP_VERSION,
+    databaseUrl:
+      runtimeHandle?.databaseUrl ?? (managed ? null : (process.env.DATABASE_URL ?? null)),
+    databasePort: runtimeHandle?.port ?? null,
+    install: runtimeHandle?.install ?? 'unknown',
+    apiHealthy,
+    startupProblem,
+    managedDatabase: managed,
+  });
+}
+
+const interactive = !(smoke || docSmoke || backupSmoke || e2e);
+
+ipcMain.handle('app:get-diagnostics', async (event): Promise<Diagnostics> => {
+  assertTrusted(event);
+  return currentDiagnostics();
+});
+ipcMain.handle('app:export-diagnostics', async (event) => {
+  assertTrusted(event);
+  const text = formatDiagnostics(await currentDiagnostics());
+  return { status: await saveDiagnosticsDialog(BrowserWindow.fromWebContents(event.sender), text) };
+});
+ipcMain.handle('app:open-log-folder', async (event) => {
+  assertTrusted(event);
+  runtimePaths ??= resolveRuntimePaths({ env: process.env, localAppData: localAppDataDir() });
+  return {
+    status:
+      (await shell.openPath(runtimePaths.logsDir)) === ''
+        ? ('opened' as const)
+        : ('failed' as const),
+  };
+});
+ipcMain.handle('app:show-safety-passphrase', async (event) => {
+  assertTrusted(event);
+  if (!managed || !runtimePaths) return { status: 'unavailable' as const };
+  try {
+    const p = loadSecrets(runtimePaths.secretsFile, electronCipher).safetyPassphrase;
+    if (!p) return { status: 'unavailable' as const };
+    await showSafetyPassphraseDialog(p);
+    return { status: 'shown' as const };
+  } catch {
+    return { status: 'unavailable' as const };
+  }
+});
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -522,24 +714,52 @@ if (!app.requestSingleInstanceLock()) {
       return net.fetch(pathToFileURL(file).toString());
     });
 
-    try {
-      await startLocalApi();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (smoke) {
-        process.stderr.write(`SMOKE_FAILED could not start the local service: ${message}\n`);
-        endProcess(1);
-        return;
+    const interactiveStart = !(smoke || docSmoke || backupSmoke || e2e);
+    const splash = interactiveStart && managed ? showSplash() : undefined;
+    for (;;) {
+      try {
+        await startLocalApi(await prepareDatabase());
+        break;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (err instanceof StartupError)
+          startupProblem = { code: err.code, message: err.userMessage };
+        appLog?.error(`start-up failed: ${err instanceof StartupError ? err.code : message}`);
+        await shutdownAll(); // stop whatever did start (never delete or re-create any data)
+        if (!interactive) {
+          if (smoke)
+            process.stderr.write(`SMOKE_FAILED could not start the local service: ${message}\n`);
+          else process.stderr.write(`START_FAILED ${message}\n`);
+          endProcess(1);
+          return;
+        }
+        splash?.destroy();
+        const choice = await showStartupFailure(
+          err instanceof Error ? err : new Error(message),
+          async () => formatDiagnostics(await currentDiagnostics()),
+          (runtimePaths ??= resolveRuntimePaths({
+            env: process.env,
+            localAppData: localAppDataDir(),
+          })),
+        );
+        if (choice === 'quit') {
+          endProcess(1);
+          return;
+        }
       }
-      dialog.showErrorBox(
-        'CommerceBill Desktop could not start',
-        `The local service failed to start. No data was changed.\n\n${message}`,
-      );
-      endProcess(1);
-      return;
     }
 
+    if (app.isPackaged) Menu.setApplicationMenu(null);
     createWindow();
+    splash?.destroy();
+    if (interactive && runtimeHandle?.upgrade?.safetyBackup)
+      void dialog.showMessageBox({
+        type: 'info',
+        title: 'CommerceBill',
+        message: 'CommerceBill was updated.',
+        detail: `Your data was updated for this version. A verified safety backup of the data from before the update was saved (${runtimeHandle.upgrade.safetyBackup}) in the backups\\pre-upgrade folder of your CommerceBill data folder.`,
+        buttons: ['OK'],
+      });
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
@@ -548,8 +768,26 @@ if (!app.requestSingleInstanceLock()) {
     // (the PDF check has no main window: closing its hidden render window must not end the process early)
     if (process.platform !== 'darwin' && !pdfSmoke) app.quit();
   });
-  app.on('will-quit', () => {
-    void api?.stop();
+  // A second launch brings the running application forward instead of starting a second copy.
+  app.on('second-instance', () => {
+    const w = mainWindow;
+    if (!w) return;
+    if (w.isMinimized()) w.restore();
+    w.show();
+    w.focus();
+  });
+  // Closing the application stops the local service and then the database it owns, cleanly, before the process ends.
+  let shutDown = false;
+  let shuttingDown = false;
+  app.on('will-quit', (event) => {
+    if (shutDown) return;
+    event.preventDefault();
+    if (shuttingDown) return;
+    shuttingDown = true;
+    void shutdownAll().finally(() => {
+      shutDown = true;
+      app.quit();
+    });
   });
   // Deny every permission request (camera, geolocation, ...) until a feature needs one.
   app.on('web-contents-created', (_e, contents) => {

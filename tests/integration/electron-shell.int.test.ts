@@ -107,10 +107,14 @@ describe('Electron shell supplies the launch secret to the API (P1-SEC-01)', () 
     expect(result.bridgeKeys).toEqual([
       'chooseBackupDestination',
       'chooseRestoreFile',
+      'exportDiagnostics',
       'getApiAccess',
       'getAppInfo',
+      'getDiagnostics',
+      'openLogFolder',
       'printInvoice',
       'saveInvoicePdf',
+      'showSafetyPassphrase',
     ]);
     expect(result.badSavePayload).toBe('rejected');
     expect(result.badPrintPayload).toBe('rejected');

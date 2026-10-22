@@ -24,6 +24,12 @@ function installBridge(): DesktopBridge {
     printInvoice: async () => ({ status: 'cancelled' }),
     chooseBackupDestination: async () => ({ status: 'cancelled' as const }),
     chooseRestoreFile: async () => ({ status: 'cancelled' as const }),
+    getDiagnostics: async () => {
+      throw new Error('not used');
+    },
+    exportDiagnostics: async () => ({ status: 'cancelled' as const }),
+    openLogFolder: async () => ({ status: 'opened' as const }),
+    showSafetyPassphrase: async () => ({ status: 'unavailable' as const }),
     getApiAccess: vi.fn(async () => ({ baseUrl: 'http://127.0.0.1:5555', secret: SECRET })),
   };
   window.commercebill = bridge;
@@ -103,6 +109,12 @@ describe('api client inside the Electron shell (P1-SEC-01)', () => {
       getAppInfo: async () => ({ name: '', version: '', platform: '' }),
       chooseBackupDestination: async () => ({ status: 'cancelled' }),
       chooseRestoreFile: async () => ({ status: 'cancelled' }),
+      getDiagnostics: async () => {
+        throw new Error('not used');
+      },
+      exportDiagnostics: async () => ({ status: 'cancelled' as const }),
+      openLogFolder: async () => ({ status: 'opened' as const }),
+      showSafetyPassphrase: async () => ({ status: 'unavailable' as const }),
       getApiAccess,
     };
     stubFetch();
