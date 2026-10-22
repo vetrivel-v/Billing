@@ -1,6 +1,6 @@
 // Helpers for the Windows packaging checks: install, run, inspect and remove the REAL installed application. Windows only.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync, type Dirent } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { createConnection } from 'node:net';
 import { join } from 'node:path';
@@ -249,8 +249,50 @@ export function uninstallEntries(): { name: string; location: string }[] {
 }
 
 /**
- * Deletes a temporary folder. Windows (antivirus, the search indexer, a handle that is still closing) can hold a just-written file for a
- * short while after its program has ended, so the delete is retried for up to a minute instead of failing the check on a transient lock.
+ * Deletes a temporary folder. Windows (antivirus, the search indexer, a handle that is still closing) can hold a just-written file or
+ * folder for a short while after its program has ended. This Node version does not retry rmSync on EPERM by itself, so the delete is
+ * retried here for up to a minute instead of failing the check on a transient lock.
  */
-export const removeDir = (dir: string) =>
-  rmSync(dir, { recursive: true, force: true, maxRetries: 120, retryDelay: 500 });
+export function removeDir(dir: string, ms = 60_000): void {
+  const end = Date.now() + ms;
+  for (;;) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (Date.now() > end) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    }
+  }
+}
+
+/** For a folder that cannot be deleted: the processes that mention it and the files that refuse to go (evidence for a failed clean-up). */
+export function deletionEvidence(dir: string): string {
+  const d = dir.toLowerCase();
+  const out = ps(
+    `Get-CimInstance Win32_Process | Where-Object { ($_.ExecutablePath -and $_.ExecutablePath.ToLower().StartsWith('${d.replace(/'/g, "''")}')) -or ($_.CommandLine -and $_.CommandLine.ToLower().Contains('${d.replace(/'/g, "''")}')) } | ForEach-Object { "$($_.ProcessId) $($_.Name) parent=$($_.ParentProcessId)" }`,
+  );
+  const stuck: string[] = [];
+  const walk = (p: string): void => {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(p, { withFileTypes: true });
+    } catch (e) {
+      stuck.push(`${p}: cannot list (${(e as NodeJS.ErrnoException).code ?? '?'})`);
+      return;
+    }
+    for (const e of entries) {
+      const f = join(p, e.name);
+      if (e.isDirectory()) walk(f);
+      else
+        try {
+          rmSync(f, { force: true });
+        } catch (err) {
+          stuck.push(`${f}: ${(err as NodeJS.ErrnoException).code ?? '?'}`);
+        }
+    }
+  };
+  walk(dir);
+  return `processes mentioning the folder: ${out || '(none)'}
+files that refuse to be deleted: ${stuck.slice(0, 10).join('; ') || '(none)'}`;
+}

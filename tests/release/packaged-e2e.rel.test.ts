@@ -24,7 +24,13 @@ import {
   assertRestartLaunch,
   driverBundle,
 } from '../e2e/fub-journey.js';
-import { killAllUnder, processesUnder, readStatus, removeDir } from './winhelp.js';
+import {
+  deletionEvidence,
+  killAllUnder,
+  processesUnder,
+  readStatus,
+  removeDir,
+} from './winhelp.js';
 
 const repo = resolve(import.meta.dirname, '..', '..');
 let work: string;
@@ -165,7 +171,17 @@ describe('the INSTALLED application with its own managed database', () => {
   }, 700_000);
 
   it('cleans up: the temporary PDF, backup, database and program copy are deleted', () => {
-    removeDir(work);
+    const started = Date.now();
+    try {
+      removeDir(work);
+    } catch (e) {
+      throw new Error(
+        `${(e as Error).message}
+after ${String(Math.round((Date.now() - started) / 1000))} s
+${deletionEvidence(work)}`,
+        { cause: e },
+      );
+    }
     expect(existsSync(work)).toBe(false);
     rmSync(work, { recursive: true, force: true });
   });
