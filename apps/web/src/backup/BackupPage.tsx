@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Card,
+  CardGrid,
   Checkbox,
   EmptyState,
   LoadingState,
@@ -676,7 +677,7 @@ export function BackupPage() {
         title="Backup & Recovery"
         description="Encrypted backups of your business data, checked by restoring them into a separate test database."
       />
-      <div className="grid gap-4 xl:grid-cols-2">
+      <CardGrid>
         <div className="space-y-4">
           <Readiness />
           <Destination canManage={canCreate} />
@@ -687,7 +688,7 @@ export function BackupPage() {
           <History canCreate={canCreate} />
           {can('backup.restore') && <Restore />}
         </div>
-      </div>
+      </CardGrid>
     </>
   );
 }

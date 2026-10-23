@@ -162,7 +162,7 @@ describe('Backup & Recovery screens against the real API', () => {
     renderAt('/settings');
     await signIn(admin);
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('link', { name: 'Open Backup & Recovery' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Backup & Recovery' }));
     expect(await screen.findByRole('heading', { name: 'Backup & Recovery' })).toBeTruthy();
 
     // nothing yet: no folder, no backups, backup requirement not met

@@ -341,7 +341,7 @@ function runBackupSmoke(win: BrowserWindow): void {
           setValue(document.querySelector('input[type="password"]'), ${JSON.stringify(process.env.ELECTRON_SMOKE_PASSWORD ?? '')});
           byText('button', /^Sign in$/).click();
           (await until(() => byText('nav a', /^Settings$/), 'the Settings link')).click();
-          (await until(() => byText('a', /^Open Backup & Recovery$/), 'the Backup & Recovery link')).click();
+          (await until(() => byText('a', /^Backup & Recovery$/), 'the Backup & Recovery link')).click();
           await until(() => document.querySelector('h1')?.textContent === 'Backup & Recovery', 'the backup screen');
           out.bridgeKeys = Object.keys(window.commercebill).sort();
           out.noFolderYet = /Not chosen yet/.test(document.body.textContent || '');

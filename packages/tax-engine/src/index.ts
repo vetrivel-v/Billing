@@ -15,7 +15,6 @@ export {
   inWindow,
   reviewState,
   selectEffectiveRate,
-  sellerConfigurationProblems,
   type BillingMode,
   type CategoryRow,
   type GateRequirement,

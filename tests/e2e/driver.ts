@@ -385,7 +385,7 @@ async function journey(): Promise<Record<string, unknown>> {
 
   await step('backup', o, async () => {
     await link('Settings');
-    await link('Open Backup & Recovery');
+    await link('Backup & Recovery');
     await heading('Backup & Recovery');
     await click('Choose folder');
     await waitFor(() => {
@@ -483,7 +483,7 @@ async function restart(): Promise<Record<string, unknown>> {
   });
   await step('backup history', o, async () => {
     await link('Settings');
-    await link('Open Backup & Recovery');
+    await link('Backup & Recovery');
     await heading('Backup & Recovery');
     const history = screen.getByRole('region', { name: 'Backup history' });
     await within(history).findByText(/\.cbbackup/);

@@ -33,6 +33,25 @@ export const READINESS_LABEL: Record<string, string> = {
   BACKUP_RESTORE_VERIFIED: 'Backup and recovery verified',
 };
 
+/**
+ * Where a person can correct each failed readiness item. Only conditions the application can actually fix have an entry, and each is
+ * shown only to people who may open that screen.
+ */
+export const READINESS_FIX: Record<string, { to: string; screen: string; permission: string }> = {
+  SELLER_REGISTERED_VALID: {
+    to: '/settings/business',
+    screen: 'Business Profile',
+    permission: 'org.settings.read',
+  },
+  TAX_REVIEW_CURRENT: { to: '/tax', screen: 'Tax Configuration', permission: 'tax.config.read' },
+  HSN_SAC_POLICY: { to: '/tax', screen: 'Tax Configuration', permission: 'tax.config.read' },
+  BACKUP_RESTORE_VERIFIED: {
+    to: '/settings/backup',
+    screen: 'Backup & Recovery',
+    permission: 'backup.history.read',
+  },
+};
+
 export const CHECK_LABEL: Record<string, string> = {
   archive_authenticated: 'Backup file is authentic and unchanged',
   archive_readable: 'Backup file can be opened',

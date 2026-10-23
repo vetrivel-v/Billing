@@ -9,6 +9,7 @@ import type {
   TaxReviewListResponse,
   TaxReviewView,
 } from '@commercebill/shared-types';
+import { sellerGateProblems } from '@commercebill/setup';
 import {
   ENGINE_VERSION,
   JURISDICTIONS,
@@ -20,7 +21,6 @@ import {
   computeConfigurationFingerprint,
   evaluateProductionGate,
   reviewState,
-  sellerConfigurationProblems,
   type CategoryRow,
   type RateRow,
 } from '@commercebill/tax-engine';
@@ -256,7 +256,7 @@ export function createTaxConfigService(options: TaxConfigServiceOptions) {
 
   async function gateFor(db: Db, organizationId: string, state: ReturnType<typeof reviewState>) {
     const org = await db.organization.findUniqueOrThrow({ where: { id: organizationId } });
-    const sellerProblems = sellerConfigurationProblems({
+    const sellerProblems = sellerGateProblems({
       gstStatus: org.gstStatus,
       gstin: org.gstin,
       stateCode: org.stateCode,

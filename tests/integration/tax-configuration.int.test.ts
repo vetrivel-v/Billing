@@ -390,7 +390,7 @@ describe('billing mode and the production gate', () => {
     // even with a valid registered seller and a current review, the verified backup/restore is still missing
     await fx.prisma.organization.update({
       where: { id: fx.orgId },
-      data: { gstStatus: 'REGISTERED', gstin: '27ABCDE1234F1Z5', stateCode: '27' },
+      data: { gstStatus: 'REGISTERED', gstin: '27AAPFU0939F1ZV', stateCode: '27' },
     });
     const again = await post('/tax/billing-mode', { mode: 'PRODUCTION' });
     expect(again.status).toBe(409);

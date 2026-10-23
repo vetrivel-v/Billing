@@ -21,6 +21,7 @@ import {
   postTaxReview,
   putHsnRequirement,
 } from '../api.js';
+import { READINESS_FIX } from '../backup/model.js';
 import { useAuth } from '../auth.js';
 import { describeFailure } from '../messages.js';
 import {
@@ -38,6 +39,11 @@ import {
 } from './model.js';
 
 const REVIEW_PAGE = 10;
+/** Requirements fixed on another screen (the tax review itself is on this page). */
+const FIX_ELSEWHERE = {
+  SELLER_REGISTERED_VALID: READINESS_FIX.SELLER_REGISTERED_VALID!,
+  BACKUP_RESTORE_VERIFIED: READINESS_FIX.BACKUP_RESTORE_VERIFIED!,
+} as Record<string, { to: string; screen: string; permission: string }>;
 const link =
   'font-medium whitespace-nowrap text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-brand-600';
 
@@ -256,6 +262,15 @@ export function TaxConfigurationPage() {
                   <Badge tone={r.met ? 'success' : 'warning'}>{r.met ? 'Met' : 'Not met'}</Badge>
                 </span>
                 <span className="text-slate-800">{REQUIREMENT_LABEL[r.code] ?? r.code}</span>
+                {!r.met && FIX_ELSEWHERE[r.code] && can(FIX_ELSEWHERE[r.code]!.permission) && (
+                  <Link
+                    to={FIX_ELSEWHERE[r.code]!.to}
+                    className={link}
+                    aria-label={`Fix: ${REQUIREMENT_LABEL[r.code] ?? r.code} (opens ${FIX_ELSEWHERE[r.code]!.screen})`}
+                  >
+                    Fix
+                  </Link>
+                )}
               </li>
             ))}
           </ul>

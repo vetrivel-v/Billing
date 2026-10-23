@@ -40,6 +40,8 @@ import type {
   ProductView,
   SetupCompleteResponse,
   SetupStatusResponse,
+  BusinessProfileSaveResponse,
+  BusinessProfileView,
 } from '@commercebill/shared-types';
 
 export const LAUNCH_SECRET_HEADER = 'x-commercebill-launch-secret';
@@ -367,6 +369,16 @@ export const postStockOperation = (
   operation: StockOperation,
   body: Record<string, unknown>,
 ): Promise<StockOperationResponse> => callApi('POST', OPERATION_PATH[operation], { token, body });
+
+// ---------------------------------------------------------------------------------------------- business profile
+
+export const getBusinessProfile = (token: string): Promise<BusinessProfileView> =>
+  callApi('GET', '/business-profile', { token });
+
+export const putBusinessProfile = (
+  token: string,
+  body: Record<string, unknown>,
+): Promise<BusinessProfileSaveResponse> => callApi('PUT', '/business-profile', { token, body });
 
 // ---------------------------------------------------------------------------------------------- tax configuration
 

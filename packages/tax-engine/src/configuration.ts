@@ -136,21 +136,8 @@ export function reviewState(
   return latestReviewFingerprint === currentFingerprint ? 'CURRENT' : 'STALE';
 }
 
-const GSTIN_SHAPE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-
-/** Facts about the seller that must hold before regular tax invoices are possible. */
-export function sellerConfigurationProblems(seller: {
-  gstStatus: string;
-  gstin: string | null;
-  stateCode: string | null;
-}): string[] {
-  const out: string[] = [];
-  if (seller.gstStatus !== 'REGISTERED') out.push('SELLER_NOT_SUPPORTED');
-  if (!seller.gstin || !GSTIN_SHAPE.test(seller.gstin)) out.push('SELLER_GSTIN_MISSING');
-  else if (!seller.stateCode || seller.gstin.slice(0, 2) !== seller.stateCode)
-    out.push('SELLER_GSTIN_STATE_MISMATCH');
-  return out;
-}
+// The seller's own GST registration facts (REGISTERED, a structurally valid GSTIN, matching state) are judged by the single shared rule set in
+// @commercebill/setup (`sellerGateProblems`); the engine only receives the resulting problem codes (see evaluateProductionGate).
 
 export type BillingMode = 'DEMO' | 'PRODUCTION';
 

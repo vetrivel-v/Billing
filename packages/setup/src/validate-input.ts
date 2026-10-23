@@ -6,14 +6,8 @@ import {
 } from '@commercebill/auth';
 import { setupSequencePlan, validateSequenceConfig } from '@commercebill/numbering';
 import { INDIA_STATE_CODES } from './india-state-codes.js';
-import {
-  FY_MAX_YEAR,
-  FY_MIN_YEAR,
-  checkGstinStructure,
-  isValidPanFormat,
-  isValidPinCode,
-  parseIsoDate,
-} from './validators.js';
+import { sellerRegistrationProblems } from './seller-rules.js';
+import { FY_MAX_YEAR, FY_MIN_YEAR, isValidPinCode, parseIsoDate } from './validators.js';
 import { problemsFromZod, setupInputSchema, type Problem, type SetupInput } from './schema.js';
 
 export interface ValidatedSetupInput {
@@ -94,26 +88,13 @@ export function validateSetupInput(raw: unknown, passwordPolicy: PasswordPolicy)
   if (!legalName) add('business.legalName', 'required');
 
   const pan = clean(input.business.pan)?.toUpperCase() ?? null;
-  if (pan && !isValidPanFormat(pan)) add('business.pan', 'invalid_pan_format');
-
   const gstin = clean(input.business.gstin)?.toUpperCase() ?? null;
   const status = input.business.gstStatus;
-  if (status === 'REGISTERED' && !gstin) add('business.gstin', 'gstin_required');
-  if (status === 'UNREGISTERED' && gstin) add('business.gstin', 'gstin_not_allowed');
-
   const stateCode = input.business.stateCode.trim();
   const stateName = INDIA_STATE_CODES[stateCode];
-  if (!stateName) add('business.stateCode', 'unknown_state_code');
-
-  if (gstin && status !== 'UNREGISTERED') {
-    const structural = checkGstinStructure(gstin);
-    if (structural) add('business.gstin', structural);
-    else {
-      if (stateName && gstin.slice(0, 2) !== stateCode)
-        add('business.gstin', 'gstin_state_mismatch');
-      if (pan && gstin.slice(2, 12) !== pan) add('business.gstin', 'gstin_pan_mismatch');
-    }
-  }
+  // One shared rule set for PAN, GSTIN, GST status and state (also used by the Business Profile and the readiness check).
+  for (const p of sellerRegistrationProblems({ gstStatus: status, gstin, pan, stateCode }))
+    add(`business.${p.field}`, p.rule);
 
   const addressLine1 = clean(input.location.addressLine1);
   if (!addressLine1) add('location.addressLine1', 'required');

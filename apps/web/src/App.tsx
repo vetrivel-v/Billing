@@ -19,6 +19,7 @@ import { InventoryPage } from './inventory/InventoryPage.js';
 import { InventoryProductPage } from './inventory/InventoryProductPage.js';
 import { StockOperationPage } from './inventory/StockOperationPage.js';
 import { LoginPage } from './LoginPage.js';
+import { BusinessProfilePage } from './settings/BusinessProfilePage.js';
 import { HsnSacPage } from './tax/HsnSacPage.js';
 import { TaxConfigurationPage } from './tax/TaxConfigurationPage.js';
 import { ProductFormPage } from './products/ProductFormPage.js';
@@ -165,6 +166,14 @@ function Shell() {
           element={
             <Guarded module="settings">
               <SettingsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/settings/business"
+          element={
+            <Guarded module="settings">
+              <BusinessProfilePage />
             </Guarded>
           }
         />

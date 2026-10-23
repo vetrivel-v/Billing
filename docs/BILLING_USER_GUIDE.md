@@ -79,3 +79,7 @@ Under **Settings > Backup & Recovery**: choose a folder, enter a passphrase twic
 ## 14. What this version cannot do
 
 Read [FIRST_USABLE_BILLING_REPORT.md](FIRST_USABLE_BILLING_REPORT.md), "Known limitations". The main ones: no cancellation, credit notes, returns or refunds; no payment reversal; invoices and payments are dated today; invoices are not saved as drafts; no services on invoices, no shipping charges, no invoice-level discount; no purchasing or accounting; no marketplace integrations; no installer; the native printer and file dialogs and a real external drive have not been tested.
+
+## When Production Readiness says NOT READY
+
+The Dashboard lists what is still missing. Each item that you can correct has a **Fix** link next to it: the seller GST registration opens Settings, Business Profile; the tax review opens Tax Configuration; the backup item opens Backup & Recovery. Items with no Fix link are already met. READY is the software's own safety checklist, not a GST or legal certification, and it never turns real billing on by itself.

@@ -78,7 +78,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-screen flex-col bg-slate-100 text-slate-900">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-100 text-slate-900">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-10 focus:rounded focus:bg-white focus:px-3 focus:py-2"
@@ -92,7 +92,13 @@ export function AppShell({
       {header}
       <div className="flex min-h-0 flex-1">
         {sidebar}
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 overflow-auto p-6 outline-none">
+        {/* `relative`: screen-reader-only text is absolutely positioned; without a positioned ancestor it sat at its content position OUTSIDE
+            the window and stretched the whole document (a blank strip and a second scrollbar). Only this area scrolls. */}
+        <main
+          id="main"
+          tabIndex={-1}
+          className="relative min-w-0 flex-1 overflow-auto p-6 outline-none"
+        >
           {children}
         </main>
       </div>

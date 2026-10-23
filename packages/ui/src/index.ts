@@ -1,7 +1,7 @@
 export { Alert, type AlertTone } from './Alert.js';
 export { Button, type ButtonProps, type ButtonVariant } from './Button.js';
 export { Badge, type BadgeTone } from './Badge.js';
-export { Card } from './Card.js';
+export { Card, CardGrid } from './Card.js';
 export { Checkbox, RadioGroup, SelectField, type RadioOption } from './Choice.js';
 export { cx } from './classes.js';
 export { PasswordInput, TextArea, TextInput } from './Field.js';

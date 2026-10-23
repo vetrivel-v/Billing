@@ -12,7 +12,6 @@ import {
   evaluateProductionGate,
   reviewState,
   selectEffectiveRate,
-  sellerConfigurationProblems,
   type CategoryRow,
   type RateRow,
 } from './configuration.js';
@@ -883,27 +882,6 @@ describe('configuration fingerprint, review state and production gate', () => {
       expect(g.eligible).toBe(false);
       expect(g.requirements.filter((r) => !r.met)).toHaveLength(1);
     }
-  });
-
-  it('describes seller configuration problems with codes', () => {
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'REGISTERED', gstin: GSTIN, stateCode: '27' }),
-    ).toEqual([]);
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'COMPOSITION', gstin: GSTIN, stateCode: '27' }),
-    ).toEqual(['SELLER_NOT_SUPPORTED']);
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'REGISTERED', gstin: null, stateCode: '27' }),
-    ).toEqual(['SELLER_GSTIN_MISSING']);
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'REGISTERED', gstin: 'garbage', stateCode: '27' }),
-    ).toEqual(['SELLER_GSTIN_MISSING']);
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'REGISTERED', gstin: GSTIN, stateCode: '29' }),
-    ).toEqual(['SELLER_GSTIN_STATE_MISMATCH']);
-    expect(
-      sellerConfigurationProblems({ gstStatus: 'REGISTERED', gstin: GSTIN, stateCode: null }),
-    ).toEqual(['SELLER_GSTIN_STATE_MISMATCH']);
   });
 });
 

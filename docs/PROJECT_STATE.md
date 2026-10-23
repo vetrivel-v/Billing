@@ -1,6 +1,6 @@
 # Project State
 
-Last updated: 2026-10-23 (after the Windows packaging milestone, following Phase 1 Task 1.18). This file and the repository are the implementation record (spec section 44).
+Last updated: 2026-10-23 (after post-FUB usability task 1: Business Profile and Settings UX). This file and the repository are the implementation record (spec section 44).
 
 | Item                      | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -197,6 +197,28 @@ None known. Migration safety (pre-migration backup, upgrade tests) is not implem
 
 None implemented. All marketplace, e-invoice, e-way bill, e-mail and WhatsApp integrations are
 **NOT VERIFIED AGAINST LIVE SERVICE** (and not yet started).
+
+## Post-FUB usability task 1: Business Profile and Settings UX (see docs/POST_FUB_BUSINESS_PROFILE_REPORT.md, ADR-0030)
+
+**The first usability task after FIRST USABLE BILLING. No billing, invoice, stock or payment architecture changed. R-040 stays open; production billing is not enabled.**
+
+- **Business Profile** (Settings, Business Profile): view and correct legal name, trade name, business type, PAN, GST registration status, GSTIN, state and the primary place of business. `GET`/`PUT /business-profile` with the existing `org.settings.read` / `org.settings.update` keys. The organization and its primary location are saved together in one transaction; Production Readiness reflects a seller correction immediately; posted invoices keep their seller snapshot.
+- **One GST rule set** shared by setup, the profile and the readiness check (the readiness check previously had its own shape-only pattern).
+- **Production Readiness Fix links** (seller to Business Profile, tax review and HSN/SAC to Tax Configuration, backup to Backup & Recovery), shown only for unmet items the application can correct.
+- **Settings:** compact grouped landing; layout defects fixed (see ADR-0030 section 10).
+- **Clarified business model (2026-10-23):** CommerceBill is primarily for MADE-TO-ORDER / CUSTOM MANUFACTURING commerce (3D printing, laser engraving; orders from Amazon, Flipkart, Instagram and calls), not buy-finished-product-and-resell retail. The roadmap below is extended (DEF-16 to DEF-18); nothing was built for it.
+- **New risks:** R-118 to R-121.
+
+## Roadmap addition: made-to-order custom manufacturing (recorded 2026-10-23, NOT implemented)
+
+Purchases are raw materials (filament, wooden and acrylic boards, LED lights, ink cartridges), not goods for resale; sales are custom items (keychains, printed photo frames and similar) made after an order arrives. To be built later, in roughly this dependency order, without changing the current billing/invoice architecture merely to document it:
+
+1. Sales Orders, with Order Source / Channel (Amazon, Flipkart, Instagram, direct call), customer customization requirements and design / attachment references.
+2. Made-to-Order products (sellable without finished stock; the product screen's "selling price" is a default price only).
+3. Raw Materials, Components and Packaging materials; procurement of raw materials (suppliers, purchase bills).
+4. BOM / material recipe per product.
+5. Production Jobs with production status, material consumption, and waste / reprint tracking.
+6. E-commerce marketplace order ingestion and external SKU mapping.
 
 ## Windows desktop packaging and installation (after Task 1.18; see docs/WINDOWS_PACKAGING_REPORT.md, ADR-0029)
 

@@ -12,3 +12,4 @@ export {
   parseIsoDate,
   type GstStatus,
 } from './validators.js';
+export { sellerRegistrationProblems, type SellerRegistrationFacts } from './seller-rules.js';

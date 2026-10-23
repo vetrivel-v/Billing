@@ -111,3 +111,11 @@ reviewed in the diff.
 - The `RunAsNode` fuse stays enabled because the service runs under the Electron binary as Node; it is limited by the launch secret, loopback-only binding and the control-secret channel. The packaged end-to-end driver needs a marker file the release installer does not contain (R-111).
 - The installer is unsigned unless a certificate is supplied at build time (R-108). SHA-256 is recorded in `release/installer-info.json`.
 - `npm audit --omit=dev --audit-level=high` is part of `verify:release`.
+
+## Business Profile controls (ADR-0030; no new permission)
+
+- `GET /business-profile` needs `org.settings.read`; `PUT /business-profile` needs `org.settings.update` (both existing; the update key is Administrator-only by default, other roles read only). Nothing checks a role name. 401 without a session, 403 without the key.
+- The organization comes from the session, never from the request; the body is a strict schema (unknown keys such as an organization id are refused) with a size limit; saves carry an expected version (a stale form gets 409, nothing is overwritten).
+- One transaction updates the organization and its primary location; a failure changes neither. Posted invoice seller snapshots are never read or written.
+- GSTIN, PAN, GST status and state are validated by the single shared rule set (format and consistency only; no GST-portal lookup). A valid format is not proof of a genuine registration.
+- Audit: actor, organization, time, correlation id, changed field names, and before/after only for PAN, GST status, GSTIN and state. Request bodies and seller details are not written to diagnostic logs.

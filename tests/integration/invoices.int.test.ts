@@ -345,7 +345,7 @@ describe('posting a DEMO invoice', () => {
       financialYearLabel: w.financialYearLabel,
       seller: {
         legalName: 'Sample Traders Private Limited',
-        gstin: '27ABCDE1234F1Z5',
+        gstin: '27AAPFU0939F1ZV',
         gstStatus: 'REGISTERED',
         stateCode: '27',
         addressLine1: '12 Market Road',

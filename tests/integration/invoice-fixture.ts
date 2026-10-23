@@ -6,7 +6,7 @@ import { businessDate } from '@commercebill/invoicing';
 import type { FastifyInstance } from 'fastify';
 import { call, type Fixture } from './auth-fixture.js';
 
-export const SELLER_GSTIN = '27ABCDE1234F1Z5';
+export const SELLER_GSTIN = '27AAPFU0939F1ZV';
 
 export interface BillingWorld {
   orgId: string;

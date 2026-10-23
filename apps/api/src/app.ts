@@ -5,7 +5,12 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { createAuthService, type HasherLike, type PartialAuthConfig } from '@commercebill/auth';
 import { pingDatabase, type PrismaClient } from '@commercebill/database';
-import { createSetupService, type SetupHooks } from '@commercebill/setup';
+import {
+  createBusinessProfileService,
+  createSetupService,
+  type BusinessProfileHooks,
+  type SetupHooks,
+} from '@commercebill/setup';
 import {
   APP_VERSION,
   ErrorCodes,
@@ -24,6 +29,7 @@ import { registerBackupRoutes } from './backup-routes.js';
 import { registerDashboardRoutes } from './dashboard-routes.js';
 import { registerProductRoutes } from './product-routes.js';
 import { registerTaxRoutes } from './tax-routes.js';
+import { registerBusinessProfileRoutes } from './business-profile-routes.js';
 import { createInventoryService } from '@commercebill/inventory-engine';
 import { createProductService } from '@commercebill/products';
 import { createTaxConfigService } from '@commercebill/tax-config';
@@ -83,6 +89,11 @@ export interface AppDeps {
     draftRateLimit?: LoginRateLimit;
     /** Test hook: fail part-way through completion to prove rollback. */
     hooks?: SetupHooks;
+  };
+  /** Business Profile (ADR-0030). */
+  businessProfile?: {
+    /** Test hook: fail inside the save transaction to prove rollback. */
+    hooks?: BusinessProfileHooks;
   };
   /** Test hook: capture structured logs. */
   logStream?: { write(msg: string): void } | undefined;
@@ -329,6 +340,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
         controlSecret: deps.backup?.controlSecret,
       });
     await registerTaxRoutes(app, taxConfigService);
+    await registerBusinessProfileRoutes(
+      app,
+      createBusinessProfileService({
+        prisma: deps.prisma,
+        appVersion: APP_VERSION,
+        ...(deps.auth?.clock ? { clock: deps.auth.clock } : {}),
+        ...(deps.businessProfile?.hooks ? { hooks: deps.businessProfile.hooks } : {}),
+      }),
+    );
     await registerInvoiceRoutes(
       app,
       createInvoiceService({

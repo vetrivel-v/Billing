@@ -44,3 +44,14 @@ See [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md).
 - **Updating.** Run the newer installer over the old one. Before changing the database the program makes and verifies a safety backup in `backups\pre-upgrade`; if that fails it stops and changes nothing. Keep the passphrase of safety backups somewhere safe.
 - **Moving to another computer.** Do not copy the data folder (its password is bound to the Windows user). Make a verified backup, install on the new computer, and restore.
 - **If it will not start**, read TROUBLESHOOTING.md; never delete the data folder.
+
+## Business Profile (Settings, Business Profile)
+
+This is where you keep the facts that appear as the **seller** on your invoices: legal and trade name, GST registration status, GSTIN, PAN, state, and your place of business (address, city, PIN code).
+
+- **Fixing "Seller GST registration recorded and valid: NOT READY".** Open the Dashboard, find the item and press **Fix**, or go to Settings, Business Profile. Choose the GST registration status, enter the GSTIN, check the state (the first two digits of the GSTIN must match it) and press **Save business profile**. The Dashboard shows the new state straight away.
+- **What is checked.** Only that the GSTIN is correctly formed (length, characters, check character), matches the state and, if you gave a PAN, matches it. CommerceBill never contacts the GST portal, so a correctly formed GSTIN is not proof that it exists or is yours. Check it against your registration certificate.
+- **What a change affects.** Future invoices and documents. Invoices already posted keep the seller details they were posted with and are never changed.
+- **Who can change it.** People whose role may update business settings (Administrator by default). Others can view it but not change it.
+- **Not stored yet.** Phone number, email, website, bank details and logo are not kept by this version.
+- Every change is recorded (who, when, and which fields; the old and new values are kept for PAN, GST status, GSTIN and state).

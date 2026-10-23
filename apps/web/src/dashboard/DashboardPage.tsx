@@ -8,7 +8,7 @@ import { formatRupees } from '../invoices/model.js';
 import { visibleModules } from '../nav.js';
 import { describeFailure } from '../messages.js';
 import { StatusPanel } from '../StatusPanel.js';
-import { GATE_TEXT, READINESS_LABEL, formatWhen } from '../backup/model.js';
+import { GATE_TEXT, READINESS_FIX, READINESS_LABEL, formatWhen } from '../backup/model.js';
 
 const link =
   'font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-brand-600';
@@ -96,6 +96,7 @@ const hasProduction = (s: DashboardSummaryResponse): boolean =>
   (s.recentInvoices ?? []).some((i) => !i.isDemo);
 
 function Readiness({ s }: { s: DashboardSummaryResponse }) {
+  const { can } = useAuth();
   if (!s.readiness) return null;
   return (
     <Card title="Production readiness">
@@ -112,6 +113,18 @@ function Readiness({ s }: { s: DashboardSummaryResponse }) {
               <span aria-hidden="true">{i.met ? '✓' : '✗'} </span>
               <span className="sr-only">{i.met ? 'Ready: ' : 'Not ready: '}</span>
               {READINESS_LABEL[i.code] ?? i.code}
+              {!i.met && READINESS_FIX[i.code] && can(READINESS_FIX[i.code]!.permission) && (
+                <>
+                  {' '}
+                  <Link
+                    to={READINESS_FIX[i.code]!.to}
+                    className={link}
+                    aria-label={`Fix: ${READINESS_LABEL[i.code] ?? i.code} (opens ${READINESS_FIX[i.code]!.screen})`}
+                  >
+                    Fix
+                  </Link>
+                </>
+              )}
             </li>
           ))}
         </ul>

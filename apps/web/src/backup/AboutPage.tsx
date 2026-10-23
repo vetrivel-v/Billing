@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Card, LoadingState, PageHeader } from '@commercebill/ui';
+import { Alert, Button, Card, CardGrid, LoadingState, PageHeader } from '@commercebill/ui';
 import { useState } from 'react';
 import { useAuth } from '../auth.js';
 import { formatWhen } from './model.js';
@@ -58,7 +58,7 @@ export function AboutPage() {
         <Alert tone="error">The diagnostics could not be read. Try again.</Alert>
       )}
       {d && (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <CardGrid>
           <Card title="Versions">
             <dl className="grid grid-cols-[11rem_1fr] gap-y-2 text-sm">
               <Fact label="CommerceBill">{d.application.version}</Fact>
@@ -147,7 +147,7 @@ export function AboutPage() {
               {message && <Alert tone={message.tone}>{message.text}</Alert>}
             </div>
           </Card>
-        </div>
+        </CardGrid>
       )}
     </>
   );

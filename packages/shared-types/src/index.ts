@@ -393,6 +393,40 @@ export interface HsnPolicyView {
   changedAt: string | null;
 }
 
+/**
+ * The seller's business profile (Settings, Business Profile). Legal facts live on the organization; the address and the registration of the
+ * primary place of business live on its primary location. They are always shown and saved together (ADR-0030).
+ */
+export interface BusinessProfileView {
+  legalName: string;
+  tradeName: string | null;
+  businessType: string | null;
+  pan: string | null;
+  gstStatus: 'REGISTERED' | 'UNREGISTERED' | 'COMPOSITION';
+  gstin: string | null;
+  stateCode: string;
+  stateName: string;
+  country: string;
+  location: {
+    name: string;
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string | null;
+    pinCode: string | null;
+  };
+  /** Changes with every save; send it back when saving (a stale form is refused, nothing is overwritten). */
+  version: number;
+  updatedAt: string;
+  /** Whether the signed-in person may save changes. */
+  canEdit: boolean;
+}
+
+export interface BusinessProfileSaveResponse {
+  profile: BusinessProfileView;
+  /** Names of the fields that actually changed (empty when nothing changed). */
+  changedFields: string[];
+}
+
 export interface TaxConfigurationResponse {
   engine: { engineVersion: string; rulesetVersion: string; roundingPolicyId: string };
   jurisdictions: {
